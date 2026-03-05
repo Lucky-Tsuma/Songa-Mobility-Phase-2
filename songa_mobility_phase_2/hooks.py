@@ -137,13 +137,11 @@ app_license = "mit"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"Wallet Request": {
+        "on_update": "songa_mobility_phase_2.services.workflow_handlers.handle_wallet_request_workflow.handle_wallet_request_workflow"
+    },
+}
 
 # Scheduled Tasks
 # ---------------
@@ -242,3 +240,9 @@ app_license = "mit"
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
 
+fixtures = [
+    "Wallet Type",
+    {"dt": "Custom Field", "filters": { "module": ["in", ["Songa App Integration", "Songa Mobility Phase 2"]] }},
+    {"dt": "Workflow", "filters": { "document_type": ["in", ["Wallet Request"]] }},
+    {"dt": "Role", "filters": { "name": ["in", ["Wallet Approver"]] }}
+]

@@ -1,0 +1,62 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-03-02 10:04:14.548680",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "driver_commission_accounts_section",
+  "expense_account",
+  "column_break_lpcu",
+  "liability_account"
+ ],
+ "fields": [
+  {
+   "fieldname": "driver_commission_accounts_section",
+   "fieldtype": "Section Break",
+   "label": "Driver commission accounts"
+  },
+  {
+   "fieldname": "expense_account",
+   "fieldtype": "Link",
+   "label": "Expense account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_lpcu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "liability_account",
+   "fieldtype": "Link",
+   "label": "Liability Account",
+   "options": "Account"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-03-05 10:50:05.202124",
+ "modified_by": "Administrator",
+ "module": "Songa App Integration",
+ "name": "Songa Customization Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

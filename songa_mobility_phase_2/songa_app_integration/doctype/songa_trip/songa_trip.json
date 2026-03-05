@@ -1,0 +1,101 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:TRIP-{#####}",
+ "creation": "2026-03-02 13:00:30.220841",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "driver",
+  "driver_name",
+  "column_break_ewfs",
+  "posting_date",
+  "wallet_request",
+  "section_break_8lt6",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fetch_from": "wallet_request.driver",
+   "fieldname": "driver",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Driver",
+   "options": "Driver"
+  },
+  {
+   "fetch_from": "wallet_request.driver_name",
+   "fieldname": "driver_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Driver Name"
+  },
+  {
+   "fieldname": "column_break_ewfs",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Posting Date"
+  },
+  {
+   "fieldname": "wallet_request",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Wallet Request",
+   "options": "Wallet Request",
+   "unique": 1
+  },
+  {
+   "fieldname": "section_break_8lt6",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Songa Trip",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "in_create": 1,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-03-05 10:59:37.893926",
+ "modified_by": "Administrator",
+ "module": "Songa App Integration",
+ "name": "Songa Trip",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
