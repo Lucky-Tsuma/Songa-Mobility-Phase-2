@@ -23,7 +23,7 @@ frappe.ui.form.on("Wallet Request", {
 const allocateCommission = (frm) => {
     return new Promise((resolve, reject) => {
         frappe.call({
-            method: "from songa_mobility_phase_2.songa_app_integration.utils.utils.allocate_commission",
+            method: "songa_mobility_phase_2.songa_app_integration.utils.utils.allocate_commission",
             args: {
                 wallet_request_name: frm.doc.name
             },
@@ -49,7 +49,7 @@ const allocateCommission = (frm) => {
 const deductCommission = (frm) => {
     return new Promise((resolve, reject) => {
         frappe.call({
-            method: "from songa_mobility_phase_2.songa_app_integration.utils.utils.deduct_commission",
+            method: "songa_mobility_phase_2.songa_app_integration.utils.utils.deduct_commission",
             args: {
                 wallet_request_name: frm.doc.name
             },
