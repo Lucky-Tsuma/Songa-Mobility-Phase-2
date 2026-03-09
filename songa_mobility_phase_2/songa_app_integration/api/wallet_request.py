@@ -1,5 +1,7 @@
 import frappe
 import json
+from ..utils.utils import deduct_commission
+from frappe.model.workflow import apply_workflow
 
 @frappe.whitelist(allow_guest=False)
 def make_wallet_request():
@@ -78,7 +80,9 @@ def make_wallet_request():
         if request_type == "trip_commission":
             frappe.db.commit()
             frappe.local.response["http_status_code"] = 201
-            return {"status": "success", "message": "Wallet request created successfully, please wait for approval", "data": wallet_request.as_dict()}
+            deduct_commission(wallet_request.name)
+            apply_workflow(wallet_request, "Approve")
+            return {"status": "success", "message": "Wallet request created successfully", "data": wallet_request.as_dict()}
 
     except Exception as e:
         frappe.local.response["http_status_code"] = 500
