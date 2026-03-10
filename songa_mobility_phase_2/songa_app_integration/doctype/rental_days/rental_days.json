@@ -10,7 +10,14 @@
   "driver_name",
   "column_break_ewfs",
   "posting_date",
-  "wallet_request",
+  "no_of_days",
+  "section_break_qjsp",
+  "status",
+  "column_break_ydpc",
+  "amount",
+  "section_break_wtoa",
+  "driver_commission_ledger",
+  "column_break_fzfe",
   "section_break_8lt6",
   "amended_from"
  ],
@@ -22,7 +29,9 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Driver",
-   "options": "Driver"
+   "options": "Driver",
+   "read_only": 1,
+   "reqd": 1
   },
   {
    "fetch_from": "wallet_request.driver_name",
@@ -30,7 +39,8 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Driver Name"
+   "label": "Driver Name",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_ewfs",
@@ -41,16 +51,9 @@
    "fieldtype": "Date",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Posting Date"
-  },
-  {
-   "fieldname": "wallet_request",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Wallet Request",
-   "options": "Wallet Request",
-   "unique": 1
+   "label": "Posting Date",
+   "read_only": 1,
+   "reqd": 1
   },
   {
    "fieldname": "section_break_8lt6",
@@ -61,10 +64,61 @@
    "fieldtype": "Link",
    "label": "Amended From",
    "no_copy": 1,
-   "options": "Songa Trip",
+   "options": "Rental Days",
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "no_of_days",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "No. of days",
+   "non_negative": 1,
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "\nAvailable\nConsumed",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "Amount",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_qjsp",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_ydpc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_wtoa",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "driver_commission_ledger",
+   "fieldtype": "Link",
+   "label": "Driver Commission Ledger",
+   "options": "Driver Commission Ledger",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_fzfe",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
@@ -72,10 +126,10 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-05 10:59:37.893926",
+ "modified": "2026-03-10 16:35:34.940420",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
- "name": "Songa Trip",
+ "name": "Rental Days",
  "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [

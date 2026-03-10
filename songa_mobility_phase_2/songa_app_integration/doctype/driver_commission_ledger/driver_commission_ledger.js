@@ -1,20 +1,9 @@
-frappe.ui.form.on("Wallet Request", {
-    refresh(frm){
-        if (frm.doc.wallet_type == "Driver rental trips" && frm.doc.request_type == "trip_commission") {
-            frm.add_custom_button("View Commission Balance", () => {
-                getCommissionBalance(frm);
-            });
-        }
-    },
+frappe.ui.form.on("Driver Commission Ledger", {
     before_workflow_action(frm) {
         if (frm.selected_workflow_action === "Approve") {
 
-            if (frm.doc.wallet_type === "Driver commission") {
+            if (frm.doc.transaction_type === "Allocation") {
                 return allocateCommission(frm);
-            }
-
-            if (frm.doc.wallet_type === "Driver rental trips" && frm.doc.request_type === "trip_commission") {
-                return deductCommission(frm);
             }
         }
     },
@@ -25,7 +14,7 @@ const allocateCommission = (frm) => {
         frappe.call({
             method: "songa_mobility_phase_2.songa_app_integration.utils.utils.allocate_commission",
             args: {
-                wallet_request_name: frm.doc.name
+                driver_commission_ledger_name: frm.doc.name
             },
             callback: function(r) {
                 if (r.message && r.message.status === "success") {
@@ -46,6 +35,7 @@ const allocateCommission = (frm) => {
     });
 }
 
+// TODO: Remove unused function
 const deductCommission = (frm) => {
     return new Promise((resolve, reject) => {
         frappe.call({
@@ -71,29 +61,5 @@ const deductCommission = (frm) => {
                 reject();
             }
         });
-    });
-}
-
-const getCommissionBalance = (frm) => {
-    frappe.call({
-        method: "songa_mobility_phase_2.songa_app_integration.utils.utils.get_commission_balance",
-        freeze: true,
-        freeze_message: "Retrieving commission balance...",
-        args: {
-            "driver_id": frm.doc.driver
-        },
-        callback: function(r) {
-            frappe.dom.unfreeze();
-            if (r.message && r.message.status === "success") {
-                const balance = r.message.balance || 0;
-                frappe.msgprint(`Total commission balance for ${frm.doc.driver_name} is ${balance}`);
-            } else {
-                frappe.msgprint("Failed to retrieve commission balance. Please check the error log for more details.");
-            }
-        },
-        error: function() {
-            frappe.dom.unfreeze();
-            frappe.msgprint("An error occurred while retrieving commission balance.");
-        }
     });
 }

@@ -20,14 +20,14 @@ def get_expense_and_liability_accounts():
 
 
 @frappe.whitelist(allow_guest=False)
-def allocate_commission(wallet_request_name):
+def allocate_commission(driver_commission_ledger_name):
     try:
-        wallet_request = frappe.get_doc("Wallet Request", wallet_request_name)
-        driver = wallet_request.driver
+        driver_commission_ledger = frappe.get_doc("Driver Commission Ledger", driver_commission_ledger_name)
+        driver = driver_commission_ledger.driver
         supplier = frappe.db.get_value("Driver", driver, "transporter")
-        amount = wallet_request.amount
+        amount = driver_commission_ledger.amount
 
-        if not frappe.db.exists("Driver", wallet_request.driver):
+        if not frappe.db.exists("Driver", driver_commission_ledger.driver):
             frappe.throw("Driver not found")
 
         if not supplier:
@@ -44,8 +44,8 @@ def allocate_commission(wallet_request_name):
                 "doctype": "Journal Entry",
                 "posting_date": frappe.utils.nowdate(),
                 "voucher_type": "Journal Entry",
-                "company": wallet_request.company,
-                "user_remark": f"Commission allocation for driver {wallet_request.driver_name} - Wallet Request {wallet_request.name}",
+                "company": driver_commission_ledger.company,
+                "user_remark": f"Commission allocation for driver {driver_commission_ledger.driver_name} - Driver Commission Ledger {driver_commission_ledger.name}",
                 "accounts": [
                     {
                         "account": liability_account,
@@ -67,7 +67,7 @@ def allocate_commission(wallet_request_name):
         journal_entry.insert()
         journal_entry.submit()
 
-        frappe.set_value("Wallet Request", wallet_request_name, "journal_entry", journal_entry.name)
+        frappe.set_value("Driver Commission Ledger", driver_commission_ledger_name, "journal_entry", journal_entry.name)
         frappe.db.commit()
 
         return {

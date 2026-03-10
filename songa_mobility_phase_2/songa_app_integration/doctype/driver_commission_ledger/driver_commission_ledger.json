@@ -1,19 +1,19 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "format:WAL-REQ-{YYYY}-{#####}",
+ "autoname": "format:COM-LEG-{YYYY}-{#####}",
  "creation": "2026-02-24 11:22:53.685193",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "company",
   "driver",
-  "driver_name",
   "column_break_cdey",
-  "wallet_type",
-  "request_type",
+  "transaction_type",
+  "driver_name",
   "section_break_mctb",
   "amount",
+  "usage",
   "column_break_nanm",
   "journal_entry",
   "section_break_ixd6",
@@ -34,7 +34,8 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Driver",
-   "options": "Driver"
+   "options": "Driver",
+   "read_only": 1
   },
   {
    "fetch_from": "driver.full_name",
@@ -51,24 +52,6 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "wallet_type",
-   "fieldtype": "Link",
-   "in_filter": 1,
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Wallet Type",
-   "options": "Wallet Type"
-  },
-  {
-   "fieldname": "request_type",
-   "fieldtype": "Select",
-   "in_filter": 1,
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Request Type",
-   "options": "\ntrip_commission\nmpesa"
-  },
-  {
    "fieldname": "section_break_mctb",
    "fieldtype": "Section Break"
   },
@@ -76,7 +59,8 @@
    "fieldname": "amount",
    "fieldtype": "Currency",
    "label": "Amount",
-   "non_negative": 1
+   "non_negative": 1,
+   "read_only": 1
   },
   {
    "fieldname": "column_break_nanm",
@@ -84,7 +68,7 @@
   },
   {
    "allow_on_submit": 1,
-   "description": "For allocation/deduction of driver commission",
+   "description": "Track allocation/deduction",
    "fieldname": "journal_entry",
    "fieldtype": "Link",
    "label": "Journal Entry",
@@ -101,13 +85,30 @@
    "fieldtype": "Link",
    "label": "Amended From",
    "no_copy": 1,
-   "options": "Wallet Request",
+   "options": "Driver Commission Ledger",
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "transaction_type",
+   "fieldtype": "Select",
+   "in_filter": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Transaction Type",
+   "options": "\nAllocation\nDeduction",
+   "read_only": 1
+  },
+  {
+   "fieldname": "usage",
+   "fieldtype": "Select",
+   "label": "Usage",
+   "options": "\nRental days recharge\nEnergy recharge"
   }
  ],
  "grid_page_length": 50,
+ "in_create": 1,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [
@@ -116,10 +117,10 @@
    "link_fieldname": "wallet_request"
   }
  ],
- "modified": "2026-03-05 10:49:37.730819",
+ "modified": "2026-03-10 15:59:38.737098",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
- "name": "Wallet Request",
+ "name": "Driver Commission Ledger",
  "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [

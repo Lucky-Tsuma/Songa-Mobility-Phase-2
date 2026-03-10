@@ -26,7 +26,9 @@ app_license = "mit"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/songa_mobility_phase_2/css/songa_mobility_phase_2.css"
-# app_include_js = "/assets/songa_mobility_phase_2/js/songa_mobility_phase_2.js"
+app_include_js = [
+    "/assets/songa_mobility_phase_2/js/driver.js"
+]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/songa_mobility_phase_2/css/songa_mobility_phase_2.css"
@@ -138,8 +140,8 @@ app_license = "mit"
 # Hook on document methods and events
 
 doc_events = {
-	"Wallet Request": {
-        "on_update": "songa_mobility_phase_2.services.workflow_handlers.handle_wallet_request_workflow.handle_wallet_request_workflow"
+	"Driver Commission Ledger": {
+        "on_update": "songa_mobility_phase_2.services.workflow_handlers.handle_commission_ledger_workflow.handle_commission_ledger_workflow"
     },
 }
 
