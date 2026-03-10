@@ -83,14 +83,14 @@ def allocate_commission(driver_commission_ledger_name):
 
 
 @frappe.whitelist(allow_guest=False)
-def deduct_commission(wallet_request_name):
+def deduct_commission(driver_commission_ledger_name, rental_days_record_name = None, KWh_record_name = None):
     try:
-        wallet_request = frappe.get_doc("Wallet Request", wallet_request_name)
-        driver = wallet_request.driver
+        driver_commission_ledger = frappe.get_doc("Driver Commission Ledger", driver_commission_ledger_name)
+        driver = driver_commission_ledger.driver
         supplier = frappe.db.get_value("Driver", driver, "transporter")
-        amount = wallet_request.amount
+        amount = driver_commission_ledger.amount
 
-        if not frappe.db.exists("Driver", wallet_request.driver):
+        if not frappe.db.exists("Driver", driver_commission_ledger.driver):
             frappe.throw("Driver not found")
 
         if not supplier:
@@ -114,8 +114,8 @@ def deduct_commission(wallet_request_name):
                 "doctype": "Journal Entry",
                 "posting_date": frappe.utils.nowdate(),
                 "voucher_type": "Journal Entry",
-                "company": wallet_request.company,
-                "user_remark": f"Commission deduction for driver {wallet_request.driver_name} - Wallet Request {wallet_request.name}",
+                "company": driver_commission_ledger.company,
+                "user_remark": f"Commission deduction for driver {driver_commission_ledger.driver} - Driver Commission Ledger {driver_commission_ledger.name}",
                 "accounts": [
                     {
                         "account": liability_account,
@@ -137,23 +137,20 @@ def deduct_commission(wallet_request_name):
         journal_entry.insert()
         journal_entry.submit()
 
-        frappe.set_value("Wallet Request", wallet_request_name, "journal_entry", journal_entry.name)
+        frappe.set_value("Driver Commission Ledger", driver_commission_ledger_name, "journal_entry", journal_entry.name)
 
-        # TODO: Find out how Songa Mobility handles driver trips and how it relates to commission deductions, implement accordingly. For now, we will create a Songa Trip linked to this wallet request to represent the deduction.
-        songa_trip = frappe.get_doc({
-            "doctype": "Songa Trip",
-            "posting_date": frappe.utils.nowdate(),
-            "wallet_request": wallet_request.name,
-        })
-        songa_trip.insert()
-        songa_trip.submit()
+        if rental_days_record_name:
+            frappe.db.set_value("Rental Days", rental_days_record_name, "driver_commission_ledger", driver_commission_ledger_name)
+        elif KWh_record_name:
+            # TODO: Deduct commission for KWh here
+            pass
+            # frappe.set_value("Driver Commission Ledger", driver_commission_ledger_name, "KWh_record", KWh_record_name)
 
         frappe.db.commit()
 
         return {
             "status": "success",
-            "message": "Commission deducted successfully.",
-            "data": {"journal_entry": journal_entry.name, "songa_trip": songa_trip.name},
+            "message": "Commission deducted successfully."
         }
     except frappe.ValidationError:
         raise

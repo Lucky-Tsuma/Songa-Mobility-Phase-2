@@ -113,11 +113,11 @@
  "is_submittable": 1,
  "links": [
   {
-   "link_doctype": "Songa Trip",
-   "link_fieldname": "wallet_request"
+   "link_doctype": "Rental Days",
+   "link_fieldname": "driver_commission_ledger"
   }
  ],
- "modified": "2026-03-10 15:59:38.737098",
+ "modified": "2026-03-10 21:32:21.750294",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Driver Commission Ledger",
