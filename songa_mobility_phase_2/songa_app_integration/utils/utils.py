@@ -38,7 +38,6 @@ def allocate_commission(driver_commission_ledger_name):
 
         expense_account, liability_account = get_expense_and_liability_accounts()
 
-        # TODO: Using a JE to allocate commission for simplicity, but we may want to consider other approaches depending on how Songa Mobility expects to receive this information and how it will be used in their system.
         journal_entry = frappe.get_doc(
             {
                 "doctype": "Journal Entry",
