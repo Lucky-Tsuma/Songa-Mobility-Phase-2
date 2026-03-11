@@ -80,12 +80,13 @@
    "reqd": 1
   },
   {
+   "depends_on": "eval: doc.transaction_type == \"Recharge\"",
    "fieldname": "amount",
    "fieldtype": "Currency",
    "label": "Amount",
+   "mandatory_depends_on": "eval: doc.transaction_type == \"Recharge\"",
    "non_negative": 1,
-   "read_only": 1,
-   "reqd": 1
+   "read_only": 1
   },
   {
    "fieldname": "section_break_qjsp",
@@ -101,9 +102,11 @@
   },
   {
    "allow_on_submit": 1,
+   "depends_on": "eval: doc.transaction_type == \"Recharge\"",
    "fieldname": "driver_commission_ledger",
    "fieldtype": "Link",
    "label": "Driver Commission Ledger",
+   "mandatory_depends_on": "eval: doc.transaction_type == \"Recharge\"",
    "options": "Driver Commission Ledger",
    "read_only": 1
   },
@@ -136,7 +139,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-11 14:47:09.254776",
+ "modified": "2026-03-11 16:21:30.687111",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Rental Days",
