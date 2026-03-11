@@ -1,30 +1,51 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "format:TRIP-{#####}",
- "creation": "2026-03-02 13:00:30.220841",
+ "autoname": "format:KWh-{#####}",
+ "creation": "2026-03-11 08:28:05.304450",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "company",
   "driver",
   "driver_name",
-  "column_break_ewfs",
+  "column_break_gqea",
   "posting_date",
-  "no_of_days",
-  "section_break_qjsp",
+  "energy_qty",
+  "section_break_epwu",
   "status",
-  "column_break_ydpc",
+  "column_break_lrev",
   "amount",
-  "section_break_wtoa",
+  "section_break_ufbf",
   "driver_commission_ledger",
-  "column_break_fzfe",
-  "section_break_8lt6",
+  "column_break_ezfw",
+  "section_break_rc1k",
   "amended_from"
  ],
  "fields": [
   {
-   "fetch_from": "wallet_request.driver",
+   "fieldname": "section_break_rc1k",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Energy KWh",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
    "fieldname": "driver",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -33,6 +54,10 @@
    "options": "Driver",
    "read_only": 1,
    "reqd": 1
+  },
+  {
+   "fieldname": "column_break_gqea",
+   "fieldtype": "Column Break"
   },
   {
    "fetch_from": "driver.full_name",
@@ -44,10 +69,6 @@
    "read_only": 1
   },
   {
-   "fieldname": "column_break_ewfs",
-   "fieldtype": "Column Break"
-  },
-  {
    "fieldname": "posting_date",
    "fieldtype": "Date",
    "in_list_view": 1,
@@ -57,27 +78,17 @@
    "reqd": 1
   },
   {
-   "fieldname": "section_break_8lt6",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "amended_from",
-   "fieldtype": "Link",
-   "label": "Amended From",
-   "no_copy": 1,
-   "options": "Rental Days",
-   "print_hide": 1,
-   "read_only": 1,
-   "search_index": 1
-  },
-  {
-   "fieldname": "no_of_days",
-   "fieldtype": "Int",
+   "fieldname": "energy_qty",
+   "fieldtype": "Float",
    "in_list_view": 1,
-   "label": "No. of days",
+   "label": "Energy Qty (in KWh)",
    "non_negative": 1,
    "read_only": 1,
    "reqd": 1
+  },
+  {
+   "fieldname": "section_break_epwu",
+   "fieldtype": "Section Break"
   },
   {
    "allow_on_submit": 1,
@@ -91,6 +102,10 @@
    "reqd": 1
   },
   {
+   "fieldname": "column_break_lrev",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "amount",
    "fieldtype": "Currency",
    "label": "Amount",
@@ -99,15 +114,7 @@
    "reqd": 1
   },
   {
-   "fieldname": "section_break_qjsp",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "column_break_ydpc",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "section_break_wtoa",
+   "fieldname": "section_break_ufbf",
    "fieldtype": "Section Break"
   },
   {
@@ -119,16 +126,8 @@
    "read_only": 1
   },
   {
-   "fieldname": "column_break_fzfe",
+   "fieldname": "column_break_ezfw",
    "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "company",
-   "fieldtype": "Link",
-   "in_standard_filter": 1,
-   "label": "Company",
-   "options": "Company",
-   "reqd": 1
   }
  ],
  "grid_page_length": 50,
@@ -136,10 +135,10 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-11 08:41:44.232596",
+ "modified": "2026-03-11 08:43:50.150433",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
- "name": "Rental Days",
+ "name": "Energy KWh",
  "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
