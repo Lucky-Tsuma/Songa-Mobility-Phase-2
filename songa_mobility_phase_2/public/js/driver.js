@@ -8,7 +8,7 @@ frappe.ui.form.on("Driver", {
 
 const getCommissionBalance = (frm) => {
     frappe.call({
-        method: "songa_mobility_phase_2.songa_app_integration.utils.utils.get_commission_balance",
+        method: "songa_mobility_phase_2.songa_app_integration.utils.utils.get_commission_balance_by_driver",
         freeze: true,
         freeze_message: "Retrieving commission balance...",
         args: {
