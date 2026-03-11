@@ -157,7 +157,7 @@ def deduct_commission(driver_commission_ledger_name, rental_days_record_name = N
 
 
 @frappe.whitelist(allow_guest=False)
-def get_commission_balance(driver_id=None):
+def get_commission_balance_by_driver(driver_id=None):
     try:
         if not driver_id and frappe.request.data:
             driver_id = json.loads(frappe.request.data).get("driver_id")
@@ -187,3 +187,55 @@ def get_commission_balance(driver_id=None):
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Commission Balance Error")
         return {"status": "error", "message": str(e)}
+
+@frappe.whitelist(allow_guest=False)
+def get_rental_days_balance_by_driver(driver_id=None):
+    try:
+        if not driver_id and frappe.request.data:
+            driver_id = json.loads(frappe.request.data).get("driver_id")
+
+        if not driver_id:
+            frappe.throw("driver_id is required")
+
+        if not frappe.db.exists("Driver", driver_id):
+            frappe.throw("Driver not found")
+
+        total_rental_days = frappe.get_list(
+            "Rental Days",
+            filters={"driver": driver_id, "status": "Available"},
+            fields=["sum(no_of_days) as total_days"],
+        )
+
+        return {"status": "success", "total_rental_days": total_rental_days[0].total_days or 0}
+    except frappe.ValidationError:
+        raise
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Rental Days Balance Error")
+        return {"status": "error", "message": str(e)}
+    
+@frappe.whitelist(allow_guest=False)
+def get_energy_kwh_balance_by_driver(driver_id=None):
+    try:
+        if not driver_id and frappe.request.data:
+            driver_id = json.loads(frappe.request.data).get("driver_id")
+
+        if not driver_id:
+            frappe.throw("driver_id is required")
+
+        if not frappe.db.exists("Driver", driver_id):
+            frappe.throw("Driver not found")
+
+        total_kwh = frappe.get_list(
+            "Energy KWh",
+            filters={"driver": driver_id, "status": "Available"},
+            fields=["sum(energy_qty) as total_kwh"],
+        )
+
+        return {"status": "success", "total_kwh": total_kwh[0].total_kwh or 0}
+    except frappe.ValidationError:
+        raise
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Energy KWh Balance Error")
+        return {"status": "error", "message": str(e)}
+
+@
