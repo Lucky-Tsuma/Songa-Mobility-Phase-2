@@ -5,5 +5,5 @@
 from frappe.model.document import Document
 
 
-class SongaTrip(Document):
+class DriverCommissionLedger(Document):
 	pass

@@ -5,5 +5,5 @@
 from frappe.model.document import Document
 
 
-class WalletRequest(Document):
+class EnergyKWh(Document):
 	pass

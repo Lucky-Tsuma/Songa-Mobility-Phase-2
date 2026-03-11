@@ -20,14 +20,14 @@ def get_expense_and_liability_accounts():
 
 
 @frappe.whitelist(allow_guest=False)
-def allocate_commission(wallet_request_name):
+def allocate_commission(driver_commission_ledger_name):
     try:
-        wallet_request = frappe.get_doc("Wallet Request", wallet_request_name)
-        driver = wallet_request.driver
+        driver_commission_ledger = frappe.get_doc("Driver Commission Ledger", driver_commission_ledger_name)
+        driver = driver_commission_ledger.driver
         supplier = frappe.db.get_value("Driver", driver, "transporter")
-        amount = wallet_request.amount
+        amount = driver_commission_ledger.amount
 
-        if not frappe.db.exists("Driver", wallet_request.driver):
+        if not frappe.db.exists("Driver", driver_commission_ledger.driver):
             frappe.throw("Driver not found")
 
         if not supplier:
@@ -38,14 +38,13 @@ def allocate_commission(wallet_request_name):
 
         expense_account, liability_account = get_expense_and_liability_accounts()
 
-        # TODO: Using a JE to allocate commission for simplicity, but we may want to consider other approaches depending on how Songa Mobility expects to receive this information and how it will be used in their system.
         journal_entry = frappe.get_doc(
             {
                 "doctype": "Journal Entry",
                 "posting_date": frappe.utils.nowdate(),
                 "voucher_type": "Journal Entry",
-                "company": wallet_request.company,
-                "user_remark": f"Commission allocation for driver {wallet_request.driver_name} - Wallet Request {wallet_request.name}",
+                "company": driver_commission_ledger.company,
+                "user_remark": f"Commission allocation for driver {driver_commission_ledger.driver_name} - Driver Commission Ledger {driver_commission_ledger.name}",
                 "accounts": [
                     {
                         "account": liability_account,
@@ -67,7 +66,7 @@ def allocate_commission(wallet_request_name):
         journal_entry.insert()
         journal_entry.submit()
 
-        frappe.set_value("Wallet Request", wallet_request_name, "journal_entry", journal_entry.name)
+        frappe.set_value("Driver Commission Ledger", driver_commission_ledger_name, "journal_entry", journal_entry.name)
         frappe.db.commit()
 
         return {
@@ -83,14 +82,14 @@ def allocate_commission(wallet_request_name):
 
 
 @frappe.whitelist(allow_guest=False)
-def deduct_commission(wallet_request_name):
+def deduct_commission(driver_commission_ledger_name, rental_days_record_name = None, KWh_record_name = None):
     try:
-        wallet_request = frappe.get_doc("Wallet Request", wallet_request_name)
-        driver = wallet_request.driver
+        driver_commission_ledger = frappe.get_doc("Driver Commission Ledger", driver_commission_ledger_name)
+        driver = driver_commission_ledger.driver
         supplier = frappe.db.get_value("Driver", driver, "transporter")
-        amount = wallet_request.amount
+        amount = driver_commission_ledger.amount
 
-        if not frappe.db.exists("Driver", wallet_request.driver):
+        if not frappe.db.exists("Driver", driver_commission_ledger.driver):
             frappe.throw("Driver not found")
 
         if not supplier:
@@ -99,7 +98,7 @@ def deduct_commission(wallet_request_name):
         if amount <= 0:
             frappe.throw("Amount must be greater than zero for deduction")
 
-        commission_balance = get_commission_balance(driver_id=driver)
+        commission_balance = get_commission_balance_by_driver(driver_id=driver)
 
         if commission_balance["status"] == "error":
             return commission_balance
@@ -114,8 +113,8 @@ def deduct_commission(wallet_request_name):
                 "doctype": "Journal Entry",
                 "posting_date": frappe.utils.nowdate(),
                 "voucher_type": "Journal Entry",
-                "company": wallet_request.company,
-                "user_remark": f"Commission deduction for driver {wallet_request.driver_name} - Wallet Request {wallet_request.name}",
+                "company": driver_commission_ledger.company,
+                "user_remark": f"Commission deduction for driver {driver_commission_ledger.driver} - Driver Commission Ledger {driver_commission_ledger.name}",
                 "accounts": [
                     {
                         "account": liability_account,
@@ -137,23 +136,18 @@ def deduct_commission(wallet_request_name):
         journal_entry.insert()
         journal_entry.submit()
 
-        frappe.set_value("Wallet Request", wallet_request_name, "journal_entry", journal_entry.name)
+        frappe.set_value("Driver Commission Ledger", driver_commission_ledger_name, "journal_entry", journal_entry.name)
 
-        # TODO: Find out how Songa Mobility handles driver trips and how it relates to commission deductions, implement accordingly. For now, we will create a Songa Trip linked to this wallet request to represent the deduction.
-        songa_trip = frappe.get_doc({
-            "doctype": "Songa Trip",
-            "posting_date": frappe.utils.nowdate(),
-            "wallet_request": wallet_request.name,
-        })
-        songa_trip.insert()
-        songa_trip.submit()
+        if rental_days_record_name:
+            frappe.db.set_value("Rental Days", rental_days_record_name, "driver_commission_ledger", driver_commission_ledger_name)
+        elif KWh_record_name:
+            frappe.db.set_value("Energy KWh", KWh_record_name, "driver_commission_ledger", driver_commission_ledger_name)
 
         frappe.db.commit()
 
         return {
             "status": "success",
-            "message": "Commission deducted successfully.",
-            "data": {"journal_entry": journal_entry.name, "songa_trip": songa_trip.name},
+            "message": "Commission deducted successfully."
         }
     except frappe.ValidationError:
         raise
@@ -163,7 +157,7 @@ def deduct_commission(wallet_request_name):
 
 
 @frappe.whitelist(allow_guest=False)
-def get_commission_balance(driver_id=None):
+def get_commission_balance_by_driver(driver_id=None):
     try:
         if not driver_id and frappe.request.data:
             driver_id = json.loads(frappe.request.data).get("driver_id")
@@ -193,3 +187,84 @@ def get_commission_balance(driver_id=None):
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Commission Balance Error")
         return {"status": "error", "message": str(e)}
+
+@frappe.whitelist(allow_guest=False)
+def get_rental_days_balance_by_driver(driver_id=None):
+    try:
+        if not driver_id and frappe.request.data:
+            driver_id = json.loads(frappe.request.data).get("driver_id")
+
+        if not driver_id:
+            frappe.throw("driver_id is required")
+
+        if not frappe.db.exists("Driver", driver_id):
+            frappe.throw("Driver not found")
+
+        total_rental_days = frappe.get_list(
+            "Rental Days",
+            filters={"driver": driver_id, "status": "Available"},
+            fields=["sum(no_of_days) as total_days"],
+        )
+
+        return {"status": "success", "total_rental_days": total_rental_days[0].total_days or 0}
+    except frappe.ValidationError:
+        raise
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Rental Days Balance Error")
+        return {"status": "error", "message": str(e)}
+    
+@frappe.whitelist(allow_guest=False)
+def get_energy_kwh_balance_by_driver(driver_id=None):
+    try:
+        if not driver_id and frappe.request.data:
+            driver_id = json.loads(frappe.request.data).get("driver_id")
+
+        if not driver_id:
+            frappe.throw("driver_id is required")
+
+        if not frappe.db.exists("Driver", driver_id):
+            frappe.throw("Driver not found")
+
+        total_kwh = frappe.get_list(
+            "Energy KWh",
+            filters={"driver": driver_id, "status": "Available"},
+            fields=["sum(energy_qty) as total_kwh"],
+        )
+
+        return {"status": "success", "total_kwh": total_kwh[0].total_kwh or 0}
+    except frappe.ValidationError:
+        raise
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Energy KWh Balance Error")
+        return {"status": "error", "message": str(e)}
+
+@frappe.whitelist(allow_guest=False)
+def get_overall_balance(driver_id):
+
+    if not driver_id and frappe.request.data:
+        driver_id = json.loads(frappe.request.data).get("driver_id")
+
+    if not driver_id:
+        frappe.throw("driver_id is required")
+
+    commission_balance = get_commission_balance_by_driver(driver_id)
+    rental_days_balance = get_rental_days_balance_by_driver(driver_id)
+    energy_kwh_balance = get_energy_kwh_balance_by_driver(driver_id)
+
+    if commission_balance["status"] == "error":
+        return {"status": "error", "message": f"Error fetching commission balance: {commission_balance['message']}"}
+
+    if rental_days_balance["status"] == "error":
+        return {"status": "error", "message": f"Error fetching rental days balance: {rental_days_balance['message']}"}
+
+    if energy_kwh_balance["status"] == "error":
+        return {"status": "error", "message": f"Error fetching energy kWh balance: {energy_kwh_balance['message']}"}
+
+    return {
+        "status": "success",
+        "data": {
+            "commission_balance": commission_balance["balance"],
+            "rental_days_balance": rental_days_balance["total_rental_days"],
+            "energy_kwh_balance": energy_kwh_balance["total_kwh"],
+        },
+    }

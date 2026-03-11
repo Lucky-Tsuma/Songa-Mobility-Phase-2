@@ -5,5 +5,5 @@
 from frappe.tests.utils import FrappeTestCase
 
 
-class TestWalletType(FrappeTestCase):
+class TestDriverCommissionLedger(FrappeTestCase):
 	pass

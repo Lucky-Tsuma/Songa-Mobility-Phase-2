@@ -5,5 +5,5 @@
 from frappe.tests.utils import FrappeTestCase
 
 
-class TestWalletRequest(FrappeTestCase):
+class TestEnergyKWh(FrappeTestCase):
 	pass
