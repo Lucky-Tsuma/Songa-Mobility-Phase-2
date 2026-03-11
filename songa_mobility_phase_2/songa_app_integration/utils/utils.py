@@ -142,9 +142,7 @@ def deduct_commission(driver_commission_ledger_name, rental_days_record_name = N
         if rental_days_record_name:
             frappe.db.set_value("Rental Days", rental_days_record_name, "driver_commission_ledger", driver_commission_ledger_name)
         elif KWh_record_name:
-            # TODO: Deduct commission for KWh here
-            pass
-            # frappe.set_value("Driver Commission Ledger", driver_commission_ledger_name, "KWh_record", KWh_record_name)
+            frappe.db.set_value("Energy KWh", KWh_record_name, "driver_commission_ledger", driver_commission_ledger_name)
 
         frappe.db.commit()
 

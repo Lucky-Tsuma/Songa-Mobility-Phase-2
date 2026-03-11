@@ -146,4 +146,79 @@ def recharge_rental_days():
 
 @frappe.whitelist(allow_guest=False)
 def recharge_kwh():
-    return {"status": "success", "message": "This endpoint will be used to recharge KWh balance"}
+    try:
+
+        data = check_for_empty_payload()
+
+        if isinstance(data, dict) and data.get("status") == "error":
+            return data
+        
+        driver_id = data.get("driver_id")
+        company = data.get("company")
+        amount = data.get("amount")
+        kwh = data.get("kwh")
+
+        check_for_empty_values(data, ["driver_id", "amount", "kwh"])
+
+        driver = frappe.db.get_value("Driver", driver_id, "name")
+
+        if not driver:
+            frappe.local.response["http_status_code"] = 404
+            return {"status": "error", "message": "Driver not found"}
+
+        try:
+            amount = float(amount)
+            if amount <= 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            frappe.local.response["http_status_code"] = 400
+            return {"status": "error", "message": "A valid positive amount is required"}
+        
+        try:
+            kwh = float(kwh)
+            if kwh <= 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            frappe.local.response["http_status_code"] = 400
+            return {"status": "error", "message": "A valid positive kWh value is required"}
+
+        commission_balance = get_commission_balance(driver_id=driver_id)
+
+        if commission_balance["status"] == "error":
+            return commission_balance
+        
+        if amount > commission_balance["balance"]:
+            frappe.local.response["http_status_code"] = 400
+            return {"status": "error", "message": "Amount exceeds commission balance"}
+
+        energy_kwh = frappe.get_doc({
+            "doctype": "Energy KWh",
+            "company": company or frappe.defaults.get_user_default("company"),
+            "posting_date": frappe.utils.nowdate(),
+            "driver": driver,
+            "energy_qty": kwh,
+            "amount": amount,
+            "status": "Available"
+        })
+        energy_kwh.insert()
+        energy_kwh.submit()
+
+        driver_commission_ledger = frappe.get_doc({
+            "doctype": "Driver Commission Ledger",
+            "company": company or frappe.defaults.get_user_default("company"),
+            "driver": driver,
+            "amount": amount,
+            "usage": "Energy recharge",
+            "transaction_type": "Deduction"
+        })
+
+        driver_commission_ledger.insert()
+        frappe.db.commit()
+
+        deduct_commission(driver_commission_ledger.name, None, energy_kwh.name)
+        apply_workflow(driver_commission_ledger, "Approve")
+        return {"status": "success", "message": "kWh recharged successfully.", "data": energy_kwh}
+
+    except Exception as e:
+        frappe.local.response["http_status_code"] = 500
+        return {"status": "error", "message": str(e)}

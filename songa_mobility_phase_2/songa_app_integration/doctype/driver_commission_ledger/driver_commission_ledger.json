@@ -115,9 +115,13 @@
   {
    "link_doctype": "Rental Days",
    "link_fieldname": "driver_commission_ledger"
+  },
+  {
+   "link_doctype": "Energy KWh",
+   "link_fieldname": "driver_commission_ledger"
   }
  ],
- "modified": "2026-03-10 21:32:21.750294",
+ "modified": "2026-03-11 09:09:20.111590",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Driver Commission Ledger",
