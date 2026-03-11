@@ -200,13 +200,14 @@ def get_rental_days_balance_by_driver(driver_id=None):
         if not frappe.db.exists("Driver", driver_id):
             frappe.throw("Driver not found")
 
-        total_rental_days = frappe.get_list(
-            "Rental Days",
-            filters={"driver": driver_id, "status": "Available"},
-            fields=["sum(no_of_days) as total_days"],
-        )
+        recharged_rental_days = frappe.get_value("Rental Days", {"driver": driver_id, "docstatus": 1, "transaction_type": "Recharge"}, "sum(no_of_days)") or 0
 
-        return {"status": "success", "total_rental_days": total_rental_days[0].total_days or 0}
+        used_rental_days = frappe.get_value("Rental Days", {"driver": driver_id, "docstatus": 1, "transaction_type": "Usage"}, "sum(no_of_days)") or 0
+
+        rental_days_balance = recharged_rental_days - used_rental_days
+
+        return {"status": "success", "total_rental_days": rental_days_balance or 0}
+    
     except frappe.ValidationError:
         raise
     except Exception as e:
@@ -231,7 +232,14 @@ def get_energy_kwh_balance_by_driver(driver_id=None):
             fields=["sum(energy_qty) as total_kwh"],
         )
 
-        return {"status": "success", "total_kwh": total_kwh[0].total_kwh or 0}
+        recharged_kwh = frappe.get_value("Energy KWh", {"driver": driver_id, "docstatus": 1, "transaction_type": "Recharge"}, "sum(energy_qty)") or 0
+
+        used_kwh = frappe.get_value("Energy KWh", {"driver": driver_id, "docstatus": 1, "transaction_type": "Usage"}, "sum(energy_qty)") or 0
+
+        total_kwh_balance = recharged_kwh - used_kwh
+
+        return {"status": "success", "total_kwh": total_kwh_balance or 0}
+    
     except frappe.ValidationError:
         raise
     except Exception as e:

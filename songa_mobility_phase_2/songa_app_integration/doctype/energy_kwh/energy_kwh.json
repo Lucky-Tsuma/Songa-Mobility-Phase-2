@@ -13,7 +13,7 @@
   "posting_date",
   "energy_qty",
   "section_break_epwu",
-  "status",
+  "transaction_type",
   "column_break_lrev",
   "amount",
   "section_break_ufbf",
@@ -91,17 +91,6 @@
    "fieldtype": "Section Break"
   },
   {
-   "allow_on_submit": 1,
-   "fieldname": "status",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Status",
-   "options": "\nAvailable\nConsumed",
-   "read_only": 1,
-   "reqd": 1
-  },
-  {
    "fieldname": "column_break_lrev",
    "fieldtype": "Column Break"
   },
@@ -128,6 +117,17 @@
   {
    "fieldname": "column_break_ezfw",
    "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "transaction_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Transaction Type",
+   "options": "\nUsage\nRecharge",
+   "read_only": 1,
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
@@ -135,7 +135,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-11 08:43:50.150433",
+ "modified": "2026-03-11 14:37:44.416168",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Energy KWh",
@@ -163,11 +163,11 @@
  "states": [
   {
    "color": "Green",
-   "title": "Available"
+   "title": "Recharge"
   },
   {
    "color": "Orange",
-   "title": "Consumed"
+   "title": "Usage"
   }
  ]
 }

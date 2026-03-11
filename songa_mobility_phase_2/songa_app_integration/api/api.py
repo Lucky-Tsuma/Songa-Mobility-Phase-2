@@ -118,7 +118,7 @@ def recharge_rental_days():
             "driver": driver,
             "no_of_days": no_of_days,
             "amount": amount,
-            "status": "Available"
+            "transaction_type": "Recharge"
         })
         rental_days.insert()
         rental_days.submit()
@@ -206,7 +206,7 @@ def recharge_kwh():
             "driver": driver,
             "energy_qty": kwh,
             "amount": amount,
-            "status": "Available"
+            "transaction_type": "Recharge"
         })
         energy_kwh.insert()
         energy_kwh.submit()
