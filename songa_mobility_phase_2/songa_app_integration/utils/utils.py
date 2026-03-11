@@ -237,5 +237,3 @@ def get_energy_kwh_balance_by_driver(driver_id=None):
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Energy KWh Balance Error")
         return {"status": "error", "message": str(e)}
-
-@
