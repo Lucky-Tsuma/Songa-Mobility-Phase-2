@@ -1,7 +1,7 @@
 import frappe
 import json
 from frappe.model.workflow import apply_workflow
-from ..utils.utils import get_commission_balance, deduct_commission
+from ..utils.utils import get_commission_balance_by_driver, get_rental_days_balance_by_driver, get_energy_kwh_balance_by_driver, deduct_commission
 
 def check_for_empty_payload():
     if not frappe.request.data:
@@ -102,7 +102,7 @@ def recharge_rental_days():
             frappe.local.response["http_status_code"] = 400
             return {"status": "error", "message": "A valid positive number of days is required"}
         
-        commission_balance = get_commission_balance(driver_id=driver_id)
+        commission_balance = get_commission_balance_by_driver(driver_id=driver_id)
 
         if commission_balance["status"] == "error":
             return commission_balance
@@ -137,7 +137,15 @@ def recharge_rental_days():
 
         deduct_commission(driver_commission_ledger.name, rental_days.name)
         apply_workflow(driver_commission_ledger, "Approve")
-        return {"status": "success", "message": "Rental days recharged successfully.", "data": rental_days}
+
+        total_rental_days_balance = get_rental_days_balance_by_driver(driver_id=driver_id)
+
+        if total_rental_days_balance["status"] == "error":
+            return total_rental_days_balance
+        
+        total_rental_days_balance = total_rental_days_balance.get("total_rental_days", 0)
+
+        return {"status": "success", "message": "Rental days recharged successfully.", "total_rental_days_balance": total_rental_days_balance}
     
 
     except Exception as e:
@@ -182,7 +190,7 @@ def recharge_kwh():
             frappe.local.response["http_status_code"] = 400
             return {"status": "error", "message": "A valid positive kWh value is required"}
 
-        commission_balance = get_commission_balance(driver_id=driver_id)
+        commission_balance = get_commission_balance_by_driver(driver_id=driver_id)
 
         if commission_balance["status"] == "error":
             return commission_balance
@@ -217,7 +225,14 @@ def recharge_kwh():
 
         deduct_commission(driver_commission_ledger.name, None, energy_kwh.name)
         apply_workflow(driver_commission_ledger, "Approve")
-        return {"status": "success", "message": "kWh recharged successfully.", "data": energy_kwh}
+
+        kwh_balance = get_energy_kwh_balance_by_driver(driver_id=driver_id)
+
+        if kwh_balance["status"] == "error":
+            return kwh_balance
+        
+        kwh_balance = kwh_balance.get("total_kwh", 0)
+        return {"status": "success", "message": "kWh recharged successfully.", "kwh_balance": kwh_balance}
 
     except Exception as e:
         frappe.local.response["http_status_code"] = 500

@@ -98,7 +98,7 @@ def deduct_commission(driver_commission_ledger_name, rental_days_record_name = N
         if amount <= 0:
             frappe.throw("Amount must be greater than zero for deduction")
 
-        commission_balance = get_commission_balance(driver_id=driver)
+        commission_balance = get_commission_balance_by_driver(driver_id=driver)
 
         if commission_balance["status"] == "error":
             return commission_balance
@@ -237,3 +237,34 @@ def get_energy_kwh_balance_by_driver(driver_id=None):
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Energy KWh Balance Error")
         return {"status": "error", "message": str(e)}
+
+@frappe.whitelist(allow_guest=False)
+def get_overall_balance(driver_id):
+
+    if not driver_id and frappe.request.data:
+        driver_id = json.loads(frappe.request.data).get("driver_id")
+
+    if not driver_id:
+        frappe.throw("driver_id is required")
+
+    commission_balance = get_commission_balance_by_driver(driver_id)
+    rental_days_balance = get_rental_days_balance_by_driver(driver_id)
+    energy_kwh_balance = get_energy_kwh_balance_by_driver(driver_id)
+
+    if commission_balance["status"] == "error":
+        return {"status": "error", "message": f"Error fetching commission balance: {commission_balance['message']}"}
+
+    if rental_days_balance["status"] == "error":
+        return {"status": "error", "message": f"Error fetching rental days balance: {rental_days_balance['message']}"}
+
+    if energy_kwh_balance["status"] == "error":
+        return {"status": "error", "message": f"Error fetching energy kWh balance: {energy_kwh_balance['message']}"}
+
+    return {
+        "status": "success",
+        "data": {
+            "commission_balance": commission_balance["balance"],
+            "rental_days_balance": rental_days_balance["total_rental_days"],
+            "energy_kwh_balance": energy_kwh_balance["total_kwh"],
+        },
+    }

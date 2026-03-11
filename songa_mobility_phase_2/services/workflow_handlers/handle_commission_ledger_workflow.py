@@ -1,5 +1,5 @@
 import frappe
-from songa_mobility_phase_2.songa_app_integration.utils.utils import get_commission_balance
+from songa_mobility_phase_2.songa_app_integration.utils.utils import get_commission_balance_by_driver
 
 TRIGGERED_STATES = {"Approved", "Rejected"}
 
@@ -14,7 +14,7 @@ def handle_commission_ledger_workflow(doc, method):
             "amount": doc.amount,
         }
 
-        commission_balance = get_commission_balance(driver_id=doc.driver)
+        commission_balance = get_commission_balance_by_driver(driver_id=doc.driver)
         return_payload["current_commission_balance"] = commission_balance.get("balance", 0)
             
 
