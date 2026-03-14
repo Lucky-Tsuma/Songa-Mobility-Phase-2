@@ -69,10 +69,18 @@ def allocate_commission():
 			}
 		)
 		driver_commission_ledger.insert()
+		frappe.db.commit()
+
 		return {
 			"status": "success",
 			"message": "Commission allocation ledger created, please await approval.",
-			"data": driver_commission_ledger,
+			"data": {
+				"name": driver_commission_ledger.name,
+				"driver": driver_commission_ledger.driver,
+				"amount": driver_commission_ledger.amount,
+				"transaction_type": driver_commission_ledger.transaction_type,
+				"company": driver_commission_ledger.company,
+			},
 		}
 
 	except Exception as e:
@@ -117,6 +125,12 @@ def recharge_rental_days():
 			frappe.local.response["http_status_code"] = 400
 			return {"status": "error", "message": "A valid positive number of days is required"}
 
+		# Lock the driver's commission ledger rows to prevent race conditions
+		frappe.db.sql(
+			"SELECT name FROM `tabDriver Commission Ledger` WHERE driver = %s FOR UPDATE",
+			driver,
+		)
+
 		commission_balance = get_commission_balance_by_driver(driver_id=driver_id)
 
 		if commission_balance["status"] == "error":
@@ -126,36 +140,43 @@ def recharge_rental_days():
 			frappe.local.response["http_status_code"] = 400
 			return {"status": "error", "message": "Amount exceeds commission balance"}
 
-		rental_days = frappe.get_doc(
-			{
-				"doctype": "Rental Days",
-				"company": company or frappe.defaults.get_user_default("company"),
-				"posting_date": frappe.utils.nowdate(),
-				"driver": driver,
-				"no_of_days": no_of_days,
-				"amount": amount,
-				"transaction_type": "Recharge",
-			}
-		)
-		rental_days.insert()
-		rental_days.submit()
+		try:
+			frappe.db.savepoint("recharge_rental_days")
 
-		driver_commission_ledger = frappe.get_doc(
-			{
-				"doctype": "Driver Commission Ledger",
-				"company": company or frappe.defaults.get_user_default("company"),
-				"driver": driver,
-				"amount": amount,
-				"usage": "Rental days recharge",
-				"transaction_type": "Deduction",
-			}
-		)
+			rental_days = frappe.get_doc(
+				{
+					"doctype": "Rental Days",
+					"company": company or frappe.defaults.get_user_default("company"),
+					"posting_date": frappe.utils.nowdate(),
+					"driver": driver,
+					"no_of_days": no_of_days,
+					"amount": amount,
+					"transaction_type": "Recharge",
+				}
+			)
+			rental_days.insert()
+			rental_days.submit()
 
-		driver_commission_ledger.insert()
-		frappe.db.commit()
+			driver_commission_ledger = frappe.get_doc(
+				{
+					"doctype": "Driver Commission Ledger",
+					"company": company or frappe.defaults.get_user_default("company"),
+					"driver": driver,
+					"amount": amount,
+					"usage": "Rental days recharge",
+					"transaction_type": "Deduction",
+				}
+			)
+			driver_commission_ledger.insert()
 
-		deduct_commission(driver_commission_ledger.name, rental_days.name)
-		apply_workflow(driver_commission_ledger, "Approve")
+			deduct_commission(driver_commission_ledger.name, rental_days.name)
+			apply_workflow(driver_commission_ledger, "Approve")
+
+			frappe.db.commit()
+
+		except Exception:
+			frappe.db.rollback(save_point="recharge_rental_days")
+			raise
 
 		total_rental_days_balance = get_rental_days_balance_by_driver(driver_id=driver_id)
 
@@ -212,6 +233,11 @@ def recharge_kwh():
 			frappe.local.response["http_status_code"] = 400
 			return {"status": "error", "message": "A valid positive kWh value is required"}
 
+		frappe.db.sql(
+			"SELECT name FROM `tabDriver Commission Ledger` WHERE driver = %s FOR UPDATE",
+			driver,
+		)
+
 		commission_balance = get_commission_balance_by_driver(driver_id=driver_id)
 
 		if commission_balance["status"] == "error":
@@ -221,36 +247,43 @@ def recharge_kwh():
 			frappe.local.response["http_status_code"] = 400
 			return {"status": "error", "message": "Amount exceeds commission balance"}
 
-		energy_kwh = frappe.get_doc(
-			{
-				"doctype": "Energy KWh",
-				"company": company or frappe.defaults.get_user_default("company"),
-				"posting_date": frappe.utils.nowdate(),
-				"driver": driver,
-				"energy_qty": kwh,
-				"amount": amount,
-				"transaction_type": "Recharge",
-			}
-		)
-		energy_kwh.insert()
-		energy_kwh.submit()
+		try:
+			frappe.db.savepoint("recharge_kwh")
 
-		driver_commission_ledger = frappe.get_doc(
-			{
-				"doctype": "Driver Commission Ledger",
-				"company": company or frappe.defaults.get_user_default("company"),
-				"driver": driver,
-				"amount": amount,
-				"usage": "Energy recharge",
-				"transaction_type": "Deduction",
-			}
-		)
+			energy_kwh = frappe.get_doc(
+				{
+					"doctype": "Energy KWh",
+					"company": company or frappe.defaults.get_user_default("company"),
+					"posting_date": frappe.utils.nowdate(),
+					"driver": driver,
+					"energy_qty": kwh,
+					"amount": amount,
+					"transaction_type": "Recharge",
+				}
+			)
+			energy_kwh.insert()
+			energy_kwh.submit()
 
-		driver_commission_ledger.insert()
-		frappe.db.commit()
+			driver_commission_ledger = frappe.get_doc(
+				{
+					"doctype": "Driver Commission Ledger",
+					"company": company or frappe.defaults.get_user_default("company"),
+					"driver": driver,
+					"amount": amount,
+					"usage": "Energy recharge",
+					"transaction_type": "Deduction",
+				}
+			)
+			driver_commission_ledger.insert()
 
-		deduct_commission(driver_commission_ledger.name, None, energy_kwh.name)
-		apply_workflow(driver_commission_ledger, "Approve")
+			deduct_commission(driver_commission_ledger.name, None, energy_kwh.name)
+			apply_workflow(driver_commission_ledger, "Approve")
+
+			frappe.db.commit()
+
+		except Exception:
+			frappe.db.rollback(save_point="recharge_kwh")
+			raise
 
 		kwh_balance = get_energy_kwh_balance_by_driver(driver_id=driver_id)
 
@@ -285,6 +318,19 @@ def consume_rental_days():
 			frappe.local.response["http_status_code"] = 404
 			return {"status": "error", "message": "Driver not found"}
 
+		try:
+			no_of_days = int(no_of_days)
+			if no_of_days <= 0:
+				raise ValueError
+		except (TypeError, ValueError):
+			frappe.local.response["http_status_code"] = 400
+			return {"status": "error", "message": "A valid positive number of days is required"}
+
+		frappe.db.sql(
+			"SELECT name FROM `tabRental Days` WHERE driver = %s FOR UPDATE",
+			driver,
+		)
+
 		rental_days_balance = get_rental_days_balance_by_driver(driver_id=driver_id)
 
 		if rental_days_balance["status"] == "error":
@@ -308,11 +354,17 @@ def consume_rental_days():
 		)
 		rental_days.insert()
 		rental_days.submit()
+		frappe.db.commit()
+
+		actual_balance = get_rental_days_balance_by_driver(driver_id=driver_id)
+
+		if actual_balance["status"] == "error":
+			return actual_balance
 
 		return {
 			"status": "success",
 			"message": "Rental days consumed successfully.",
-			"total_rental_days_balance": rental_days_balance - no_of_days,
+			"total_rental_days_balance": actual_balance.get("total_rental_days", 0),
 		}
 
 	except Exception as e:
@@ -340,6 +392,19 @@ def consume_kwh():
 			frappe.local.response["http_status_code"] = 404
 			return {"status": "error", "message": "Driver not found"}
 
+		try:
+			kwh = float(kwh)
+			if kwh <= 0:
+				raise ValueError
+		except (TypeError, ValueError):
+			frappe.local.response["http_status_code"] = 400
+			return {"status": "error", "message": "A valid positive kWh value is required"}
+
+		frappe.db.sql(
+			"SELECT name FROM `tabEnergy KWh` WHERE driver = %s FOR UPDATE",
+			driver,
+		)
+
 		kwh_balance = get_energy_kwh_balance_by_driver(driver_id=driver_id)
 
 		if kwh_balance["status"] == "error":
@@ -363,11 +428,17 @@ def consume_kwh():
 		)
 		energy_kwh.insert()
 		energy_kwh.submit()
+		frappe.db.commit()
+
+		actual_balance = get_energy_kwh_balance_by_driver(driver_id=driver_id)
+
+		if actual_balance["status"] == "error":
+			return actual_balance
 
 		return {
 			"status": "success",
 			"message": "kWh consumed successfully.",
-			"kwh_balance": kwh_balance - kwh,
+			"kwh_balance": actual_balance.get("total_kwh", 0),
 		}
 
 	except Exception as e:
