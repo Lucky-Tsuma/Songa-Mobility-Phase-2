@@ -18,6 +18,7 @@
   "amount",
   "section_break_wtoa",
   "driver_commission_ledger",
+  "mpesa_express_request",
   "column_break_fzfe",
   "section_break_8lt6",
   "amended_from"
@@ -132,6 +133,14 @@
    "options": "\nUsage\nRecharge",
    "read_only": 1,
    "reqd": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "mpesa_express_request",
+   "fieldtype": "Link",
+   "label": "Mpesa Express Request",
+   "options": "Mpesa Express Request",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
@@ -139,7 +148,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-11 16:21:30.687111",
+ "modified": "2026-03-15 16:45:01.339438",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Rental Days",

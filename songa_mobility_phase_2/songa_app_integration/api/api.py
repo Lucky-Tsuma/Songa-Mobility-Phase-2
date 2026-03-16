@@ -1,4 +1,5 @@
 import json
+import re
 
 import frappe
 from frappe.model.workflow import apply_workflow
@@ -29,6 +30,18 @@ def check_for_empty_values(data, required_fields):
 	missing = [f for f in required_fields if not data.get(f)]
 	if missing:
 		raise ValueError(f"Missing required fields: {', '.join(missing)}")
+
+
+def validate_phone_number(phone_number=None):
+	if not phone_number or len(phone_number) < 9:
+		return False
+
+	number = phone_number.strip().replace(" ", "")
+
+	if not re.match(r"^(?:\+254|254|0)(7\d{8}|1\d{8})$", number):
+		return False
+
+	return True
 
 
 @frappe.whitelist(allow_guest=False)
@@ -100,8 +113,19 @@ def recharge_rental_days():
 		company = data.get("company")
 		amount = data.get("amount")
 		no_of_days = data.get("no_of_days")
+		payment_method = data.get("payment_method")
+		phone_number = data.get("phone_number")
 
-		check_for_empty_values(data, ["driver_id", "amount", "no_of_days"])
+		mandatory_fields = ["driver_id", "amount", "no_of_days", "payment_method"]
+
+		if payment_method == "mpesa":
+			mandatory_fields.append("phone_number")
+
+		check_for_empty_values(data, mandatory_fields)
+
+		if payment_method not in ("commission", "mpesa"):
+			frappe.local.response["http_status_code"] = 400
+			return {"status": "error", "message": "Invalid payment method. Must be 'commission' or 'mpesa'"}
 
 		driver = frappe.db.get_value("Driver", driver_id, "name")
 
@@ -125,20 +149,35 @@ def recharge_rental_days():
 			frappe.local.response["http_status_code"] = 400
 			return {"status": "error", "message": "A valid positive number of days is required"}
 
-		# Lock the driver's commission ledger rows to prevent race conditions
-		frappe.db.sql(
-			"SELECT name FROM `tabDriver Commission Ledger` WHERE driver = %s FOR UPDATE",
-			driver,
-		)
+		if payment_method == "commission":
+			# Lock the driver's commission ledger rows to prevent race conditions
+			frappe.db.sql(
+				"SELECT name FROM `tabDriver Commission Ledger` WHERE driver = %s FOR UPDATE",
+				driver,
+			)
 
-		commission_balance = get_commission_balance_by_driver(driver_id=driver_id)
+			commission_balance = get_commission_balance_by_driver(driver_id=driver_id)
 
-		if commission_balance["status"] == "error":
-			return commission_balance
+			if commission_balance["status"] == "error":
+				return commission_balance
 
-		if amount > commission_balance["balance"]:
-			frappe.local.response["http_status_code"] = 400
-			return {"status": "error", "message": "Amount exceeds commission balance"}
+			if amount > commission_balance["balance"]:
+				frappe.local.response["http_status_code"] = 400
+				return {"status": "error", "message": "Amount exceeds commission balance"}
+
+		elif payment_method == "mpesa":
+			if not validate_phone_number(phone_number):
+				frappe.local.response["http_status_code"] = 400
+				return {"status": "error", "message": "Invalid phone number"}
+
+			payment_gateway = frappe.get_single("Songa Customization Settings").stk_push_payment_gateway
+
+			if not payment_gateway:
+				frappe.local.response["http_status_code"] = 500
+				return {
+					"status": "error",
+					"message": "Please select the payment gateway on Songa Customization Settings",
+				}
 
 		try:
 			frappe.db.savepoint("recharge_rental_days")
@@ -155,22 +194,44 @@ def recharge_rental_days():
 				}
 			)
 			rental_days.insert()
-			rental_days.submit()
 
-			driver_commission_ledger = frappe.get_doc(
-				{
-					"doctype": "Driver Commission Ledger",
-					"company": company or frappe.defaults.get_user_default("company"),
-					"driver": driver,
-					"amount": amount,
-					"usage": "Rental days recharge",
-					"transaction_type": "Deduction",
-				}
-			)
-			driver_commission_ledger.insert()
+			if payment_method == "commission":
+				# submit now for recharge based on commission
+				rental_days.submit()
 
-			deduct_commission(driver_commission_ledger.name, rental_days.name)
-			apply_workflow(driver_commission_ledger, "Approve")
+				driver_commission_ledger = frappe.get_doc(
+					{
+						"doctype": "Driver Commission Ledger",
+						"company": company or frappe.defaults.get_user_default("company"),
+						"driver": driver,
+						"amount": amount,
+						"usage": "Rental days recharge",
+						"transaction_type": "Deduction",
+					}
+				)
+				driver_commission_ledger.insert()
+
+				deduct_commission(driver_commission_ledger.name, rental_days.name)
+				apply_workflow(driver_commission_ledger, "Approve")
+
+			elif payment_method == "mpesa":
+				# Rental days have been saved as draft, will be submitted later after payment is confirmed.
+				# Use workflow handlers to check payment status and submit rental days
+				mpesa_express_request = frappe.get_doc(
+					{
+						"doctype": "Mpesa Express Request",
+						"phone_number": phone_number,
+						"payment_gateway": payment_gateway,
+						"reference_doctype": "Rental Days",
+						"reference_name": rental_days.name,
+						"transaction_title": "Rental days recharge",
+						"transaction_description": f"Rental days recharge for driver {driver_id}, via Mpesa STK Push",
+						"currency": "KES",
+						"amount": amount,
+					}
+				)
+				mpesa_express_request.insert()
+				mpesa_express_request.submit()
 
 			frappe.db.commit()
 
@@ -178,17 +239,23 @@ def recharge_rental_days():
 			frappe.db.rollback(save_point="recharge_rental_days")
 			raise
 
+		if payment_method == "mpesa":
+			# Return early — the balance has not changed yet
+			return {
+				"status": "pending",
+				"message": "M-Pesa payment initiated. Rental days will be recharged once payment is confirmed.",
+				"mpesa_request": mpesa_express_request.name,
+			}
+
 		total_rental_days_balance = get_rental_days_balance_by_driver(driver_id=driver_id)
 
 		if total_rental_days_balance["status"] == "error":
 			return total_rental_days_balance
 
-		total_rental_days_balance = total_rental_days_balance.get("total_rental_days", 0)
-
 		return {
 			"status": "success",
 			"message": "Rental days recharged successfully.",
-			"total_rental_days_balance": total_rental_days_balance,
+			"total_rental_days_balance": total_rental_days_balance.get("total_rental_days", 0),
 		}
 
 	except Exception as e:
@@ -233,6 +300,7 @@ def recharge_kwh():
 			frappe.local.response["http_status_code"] = 400
 			return {"status": "error", "message": "A valid positive kWh value is required"}
 
+		# Lock the driver's commission ledger rows to prevent race conditions
 		frappe.db.sql(
 			"SELECT name FROM `tabDriver Commission Ledger` WHERE driver = %s FOR UPDATE",
 			driver,
