@@ -26,9 +26,7 @@ app_license = "mit"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/songa_mobility_phase_2/css/songa_mobility_phase_2.css"
-app_include_js = [
-    "/assets/songa_mobility_phase_2/js/driver.js"
-]
+app_include_js = ["/assets/songa_mobility_phase_2/js/driver.js"]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/songa_mobility_phase_2/css/songa_mobility_phase_2.css"
@@ -141,8 +139,11 @@ app_include_js = [
 
 doc_events = {
 	"Driver Commission Ledger": {
-        "on_update": "songa_mobility_phase_2.services.workflow_handlers.handle_commission_ledger_workflow.handle_commission_ledger_workflow"
-    },
+		"on_update": "songa_mobility_phase_2.services.workflow_handlers.handle_commission_ledger_workflow.handle_commission_ledger_workflow"
+	},
+	"Mpesa Express Request": {
+		"on_update": "songa_mobility_phase_2.services.workflow_handlers.handle_mpesa_express_request_workflow.handle_mpesa_express_request_workflow"
+	},
 }
 
 # Scheduled Tasks
@@ -243,8 +244,11 @@ doc_events = {
 # }
 
 fixtures = [
-    "Wallet Type",
-    {"dt": "Custom Field", "filters": { "module": ["in", ["Songa App Integration", "Songa Mobility Phase 2"]] }},
-    {"dt": "Workflow", "filters": { "document_type": ["in", ["Driver Commission Ledger"]] }},
-    {"dt": "Role", "filters": { "name": ["in", ["Wallet Approver"]] }}
+	"Wallet Type",
+	{
+		"dt": "Custom Field",
+		"filters": {"module": ["in", ["Songa App Integration", "Songa Mobility Phase 2"]]},
+	},
+	{"dt": "Workflow", "filters": {"document_type": ["in", ["Driver Commission Ledger"]]}},
+	{"dt": "Role", "filters": {"name": ["in", ["Wallet Approver"]]}},
 ]
