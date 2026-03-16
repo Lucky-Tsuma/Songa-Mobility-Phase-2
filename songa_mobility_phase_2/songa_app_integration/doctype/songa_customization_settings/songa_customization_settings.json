@@ -8,7 +8,10 @@
   "driver_commission_accounts_section",
   "expense_account",
   "column_break_lpcu",
-  "liability_account"
+  "liability_account",
+  "section_break_bvvf",
+  "stk_push_payment_gateway",
+  "column_break_gpea"
  ],
  "fields": [
   {
@@ -31,13 +34,27 @@
    "fieldtype": "Link",
    "label": "Liability Account",
    "options": "Account"
+  },
+  {
+   "fieldname": "section_break_bvvf",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "stk_push_payment_gateway",
+   "fieldtype": "Link",
+   "label": "STK Push payment gateway",
+   "options": "Payment Gateway"
+  },
+  {
+   "fieldname": "column_break_gpea",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-05 10:50:05.202124",
+ "modified": "2026-03-15 18:09:28.481704",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Songa Customization Settings",
