@@ -1,6 +1,9 @@
 import frappe
 
-from songa_mobility_phase_2.songa_app_integration.utils.utils import get_rental_days_balance_by_driver
+from songa_mobility_phase_2.songa_app_integration.utils.utils import (
+	get_energy_kwh_balance_by_driver,
+	get_rental_days_balance_by_driver,
+)
 
 
 def handle_mpesa_express_request_workflow(doc, method):
@@ -11,22 +14,23 @@ def handle_mpesa_express_request_workflow(doc, method):
 		if doc.status not in ("Completed", "Failed"):
 			return
 
-		if doc.reference_doctype != "Rental Days":
+		if doc.reference_doctype not in ("Rental Days", "Energy KWh"):
 			return
 
-		rental_days = frappe.get_doc("Rental Days", doc.reference_name)
+		reference_doctype = doc.reference_doctype
+		reference_doc = frappe.get_doc(reference_doctype, doc.reference_name)
 
 		# Guard against duplicate triggers on an already-processed record
-		if rental_days.docstatus != 0:
+		if reference_doc.docstatus != 0:
 			return
 
 		try:
 			frappe.db.savepoint("mpesa_express_request")
 
 			if doc.status == "Completed":
-				rental_days.mpesa_express_request = doc.name
-				rental_days.save(ignore_permissions=True)
-				rental_days.submit()
+				reference_doc.mpesa_express_request = doc.name
+				reference_doc.save(ignore_permissions=True)
+				reference_doc.submit()
 
 			elif doc.status == "Failed":
 				# Clear the back-reference on Mpesa Express Request first so
@@ -39,7 +43,7 @@ def handle_mpesa_express_request_workflow(doc, method):
 					""",
 					doc.name,
 				)
-				frappe.delete_doc("Rental Days", rental_days.name, ignore_permissions=True)
+				frappe.delete_doc(reference_doctype, reference_doc.name, ignore_permissions=True)
 
 			frappe.db.commit()
 
@@ -48,14 +52,17 @@ def handle_mpesa_express_request_workflow(doc, method):
 			raise
 
 		if doc.status == "Completed":
-			balance = get_rental_days_balance_by_driver(driver_id=rental_days.driver)
+			balance = (
+				get_rental_days_balance_by_driver(driver_id=reference_doc.driver).get("total_rental_days", 0)
+				if reference_doctype == "Rental Days"
+				else get_energy_kwh_balance_by_driver(driver_id=reference_doc.driver).get("total_kwh", 0)
+			)
 			frappe.logger().info(
-				f"Rental days recharged for driver {rental_days.driver}. "
-				f"New balance: {balance.get('total_rental_days', 0)}"
+				f"{reference_doctype} recharged for driver {reference_doc.driver}. " f"New balance: {balance}"
 			)
 		else:
 			frappe.logger().info(
-				f"Rental days recharge cancelled for driver {rental_days.driver} "
+				f"{reference_doctype} recharge cancelled for driver {reference_doc.driver} "
 				f"due to failed M-Pesa payment."
 			)
 

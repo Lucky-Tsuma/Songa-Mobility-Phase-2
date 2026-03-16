@@ -275,8 +275,19 @@ def recharge_kwh():
 		company = data.get("company")
 		amount = data.get("amount")
 		kwh = data.get("kwh")
+		payment_method = data.get("payment_method")
+		phone_number = data.get("phone_number")
 
-		check_for_empty_values(data, ["driver_id", "amount", "kwh"])
+		mandatory_fields = ["driver_id", "amount", "kwh"]
+
+		if payment_method == "mpesa":
+			mandatory_fields.append("phone_number")
+
+		check_for_empty_values(data, mandatory_fields)
+
+		if payment_method not in ("commission", "mpesa"):
+			frappe.local.response["http_status_code"] = 400
+			return {"status": "error", "message": "Invalid payment method. Must be 'commission' or 'mpesa'"}
 
 		driver = frappe.db.get_value("Driver", driver_id, "name")
 
@@ -300,20 +311,35 @@ def recharge_kwh():
 			frappe.local.response["http_status_code"] = 400
 			return {"status": "error", "message": "A valid positive kWh value is required"}
 
-		# Lock the driver's commission ledger rows to prevent race conditions
-		frappe.db.sql(
-			"SELECT name FROM `tabDriver Commission Ledger` WHERE driver = %s FOR UPDATE",
-			driver,
-		)
+		if payment_method == "commission":
+			# Lock the driver's commission ledger rows to prevent race conditions
+			frappe.db.sql(
+				"SELECT name FROM `tabDriver Commission Ledger` WHERE driver = %s FOR UPDATE",
+				driver,
+			)
 
-		commission_balance = get_commission_balance_by_driver(driver_id=driver_id)
+			commission_balance = get_commission_balance_by_driver(driver_id=driver_id)
 
-		if commission_balance["status"] == "error":
-			return commission_balance
+			if commission_balance["status"] == "error":
+				return commission_balance
 
-		if amount > commission_balance["balance"]:
-			frappe.local.response["http_status_code"] = 400
-			return {"status": "error", "message": "Amount exceeds commission balance"}
+			if amount > commission_balance["balance"]:
+				frappe.local.response["http_status_code"] = 400
+				return {"status": "error", "message": "Amount exceeds commission balance"}
+
+		elif payment_method == "mpesa":
+			if not validate_phone_number(phone_number):
+				frappe.local.response["http_status_code"] = 400
+				return {"status": "error", "message": "Invalid phone number"}
+
+			payment_gateway = frappe.get_single("Songa Customization Settings").stk_push_payment_gateway
+
+			if not payment_gateway:
+				frappe.local.response["http_status_code"] = 500
+				return {
+					"status": "error",
+					"message": "Please select the payment gateway on Songa Customization Settings",
+				}
 
 		try:
 			frappe.db.savepoint("recharge_kwh")
@@ -330,22 +356,44 @@ def recharge_kwh():
 				}
 			)
 			energy_kwh.insert()
-			energy_kwh.submit()
 
-			driver_commission_ledger = frappe.get_doc(
-				{
-					"doctype": "Driver Commission Ledger",
-					"company": company or frappe.defaults.get_user_default("company"),
-					"driver": driver,
-					"amount": amount,
-					"usage": "Energy recharge",
-					"transaction_type": "Deduction",
-				}
-			)
-			driver_commission_ledger.insert()
+			if payment_method == "commission":
+				# submit now for recharge based on commission
+				energy_kwh.submit()
 
-			deduct_commission(driver_commission_ledger.name, None, energy_kwh.name)
-			apply_workflow(driver_commission_ledger, "Approve")
+				driver_commission_ledger = frappe.get_doc(
+					{
+						"doctype": "Driver Commission Ledger",
+						"company": company or frappe.defaults.get_user_default("company"),
+						"driver": driver,
+						"amount": amount,
+						"usage": "Energy recharge",
+						"transaction_type": "Deduction",
+					}
+				)
+				driver_commission_ledger.insert()
+
+				deduct_commission(driver_commission_ledger.name, None, energy_kwh.name)
+				apply_workflow(driver_commission_ledger, "Approve")
+
+			elif payment_method == "mpesa":
+				# Rental days have been saved as draft, will be submitted later after payment is confirmed.
+				# Use workflow handlers to check payment status and submit rental days
+				mpesa_express_request = frappe.get_doc(
+					{
+						"doctype": "Mpesa Express Request",
+						"phone_number": phone_number,
+						"payment_gateway": payment_gateway,
+						"reference_doctype": "Energy KWh",
+						"reference_name": energy_kwh.name,
+						"transaction_title": "Energy KWh recharge",
+						"transaction_description": f"Energy KWh recharge for driver {driver_id}, via Mpesa STK Push",
+						"currency": "KES",
+						"amount": amount,
+					}
+				)
+				mpesa_express_request.insert()
+				mpesa_express_request.submit()
 
 			frappe.db.commit()
 
@@ -353,13 +401,24 @@ def recharge_kwh():
 			frappe.db.rollback(save_point="recharge_kwh")
 			raise
 
+		if payment_method == "mpesa":
+			# Retuen early - the balance has not changed yet
+			return {
+				"status": "pending",
+				"message": "M-Pesa payment initiated. Energy KWh will be recharged once payment is confirmed.",
+				"mpesa_request": mpesa_express_request.name,
+			}
+
 		kwh_balance = get_energy_kwh_balance_by_driver(driver_id=driver_id)
 
 		if kwh_balance["status"] == "error":
 			return kwh_balance
 
-		kwh_balance = kwh_balance.get("total_kwh", 0)
-		return {"status": "success", "message": "kWh recharged successfully.", "kwh_balance": kwh_balance}
+		return {
+			"status": "success",
+			"message": "kWh recharged successfully.",
+			"kwh_balance": kwh_balance.get("total_kwh", 0),
+		}
 
 	except Exception as e:
 		frappe.local.response["http_status_code"] = 500
