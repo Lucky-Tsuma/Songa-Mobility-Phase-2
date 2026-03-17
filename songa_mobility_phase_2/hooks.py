@@ -140,32 +140,34 @@ app_include_js = ["/assets/songa_mobility_phase_2/js/driver.js"]
 doc_events = {
 	"Driver Commission Ledger": {
 		"on_update": "songa_mobility_phase_2.services.workflow_handlers.handle_commission_ledger_workflow.handle_commission_ledger_workflow"
-	},
-	"Mpesa Express Request": {
-		"on_update": "songa_mobility_phase_2.services.workflow_handlers.handle_mpesa_express_request_workflow.handle_mpesa_express_request_workflow"
-	},
+	}
 }
 
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"songa_mobility_phase_2.tasks.all"
-# 	],
-# 	"daily": [
-# 		"songa_mobility_phase_2.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"songa_mobility_phase_2.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"songa_mobility_phase_2.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"songa_mobility_phase_2.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"cron": {
+		"* * * * *": [
+			"songa_mobility_phase_2.songa_app_integration.utils.tasks.process_pending_mpesa_express_requests"
+		]
+	}
+	# 	"all": [
+	# 		"songa_mobility_phase_2.tasks.all"
+	# 	],
+	# 	"daily": [
+	# 		"songa_mobility_phase_2.tasks.daily"
+	# 	],
+	# 	"hourly": [
+	# 		"songa_mobility_phase_2.tasks.hourly"
+	# 	],
+	# 	"weekly": [
+	# 		"songa_mobility_phase_2.tasks.weekly"
+	# 	],
+	# 	"monthly": [
+	# 		"songa_mobility_phase_2.tasks.monthly"
+	# 	],
+}
 
 # Testing
 # -------
