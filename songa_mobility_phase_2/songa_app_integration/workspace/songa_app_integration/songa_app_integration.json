@@ -1,0 +1,70 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"dkGtA8JuFG\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Songa App Integration</span>\",\"col\":12}},{\"id\":\"8yaY1YwSaC\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Driver\",\"col\":3}},{\"id\":\"OSN03pvxKl\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Energy KWh\",\"col\":3}},{\"id\":\"m6FzEhEOFW\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Rental Days\",\"col\":3}},{\"id\":\"3DJesjRtJr\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"STK Push\",\"col\":3}},{\"id\":\"iFifzeazHN\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Driver Commission Ledger\",\"col\":3}}]",
+ "creation": "2026-03-17 16:12:17.274190",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "integration",
+ "idx": 0,
+ "indicator_color": "green",
+ "is_hidden": 0,
+ "label": "Songa App Integration",
+ "links": [],
+ "modified": "2026-03-17 16:27:26.719628",
+ "modified_by": "Administrator",
+ "module": "Songa App Integration",
+ "name": "Songa App Integration",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [],
+ "sequence_id": 50.0,
+ "shortcuts": [
+  {
+   "color": "Green",
+   "doc_view": "List",
+   "label": "Driver",
+   "link_to": "Driver",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Green",
+   "doc_view": "List",
+   "label": "Energy KWh",
+   "link_to": "Energy KWh",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Green",
+   "doc_view": "List",
+   "label": "Rental Days",
+   "link_to": "Rental Days",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Orange",
+   "doc_view": "List",
+   "label": "STK Push",
+   "link_to": "Mpesa Express Request",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Blue",
+   "doc_view": "List",
+   "label": "Driver Commission Ledger",
+   "link_to": "Driver Commission Ledger",
+   "stats_filter": "[]",
+   "type": "DocType"
+  }
+ ],
+ "title": "Songa App Integration"
+}
