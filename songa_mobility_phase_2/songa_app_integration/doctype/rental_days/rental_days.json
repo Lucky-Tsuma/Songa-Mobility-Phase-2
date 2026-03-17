@@ -154,7 +154,8 @@
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "In Progress\nCompleted\nFailed"
+   "options": "In Progress\nCompleted\nFailed",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
@@ -162,7 +163,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-17 14:46:11.492827",
+ "modified": "2026-03-17 15:08:34.300868",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Rental Days",
@@ -190,11 +191,15 @@
  "states": [
   {
    "color": "Green",
-   "title": "Available"
+   "title": "Completed"
   },
   {
    "color": "Orange",
-   "title": "Consumed"
+   "title": "In Progress"
+  },
+  {
+   "color": "Red",
+   "title": "Failed"
   }
  ]
 }

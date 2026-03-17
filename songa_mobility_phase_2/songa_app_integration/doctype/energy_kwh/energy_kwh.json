@@ -153,7 +153,8 @@
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "In Progress\nCompleted\nFailed"
+   "options": "In Progress\nCompleted\nFailed",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
@@ -161,7 +162,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-17 14:45:34.992434",
+ "modified": "2026-03-17 15:09:42.033449",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Energy KWh",
@@ -189,11 +190,15 @@
  "states": [
   {
    "color": "Green",
-   "title": "Recharge"
+   "title": "Completed"
   },
   {
    "color": "Orange",
-   "title": "Usage"
+   "title": "In Progress"
+  },
+  {
+   "color": "Red",
+   "title": "Failed"
   }
  ]
 }
