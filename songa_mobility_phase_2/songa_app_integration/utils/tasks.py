@@ -9,6 +9,7 @@ def process_pending_mpesa_express_requests():
 		"Mpesa Express Request",
 		filters={
 			"status": ("in", ["Completed", "Failed"]),
+			"docstatus": 1,
 			"reference_doctype": ("in", ["Rental Days", "Energy KWh"]),
 			"modified": (">=", frappe.utils.add_to_date(None, minutes=-15)),
 		},
