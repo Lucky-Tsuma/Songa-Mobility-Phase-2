@@ -232,7 +232,7 @@ def get_rental_days_balance_by_driver(driver_id=None):
 		recharged_rental_days = (
 			frappe.get_value(
 				"Rental Days",
-				{"driver": driver_id, "docstatus": 1, "transaction_type": "Recharge"},
+				{"driver": driver_id, "docstatus": 1, "transaction_type": "Recharge", "status": "Completed"},
 				"sum(no_of_days)",
 			)
 			or 0
@@ -241,7 +241,7 @@ def get_rental_days_balance_by_driver(driver_id=None):
 		used_rental_days = (
 			frappe.get_value(
 				"Rental Days",
-				{"driver": driver_id, "docstatus": 1, "transaction_type": "Usage"},
+				{"driver": driver_id, "docstatus": 1, "transaction_type": "Usage", "status": "Completed"},
 				"sum(no_of_days)",
 			)
 			or 0
@@ -273,7 +273,7 @@ def get_energy_kwh_balance_by_driver(driver_id=None):
 		recharged_kwh = (
 			frappe.get_value(
 				"Energy KWh",
-				{"driver": driver_id, "docstatus": 1, "transaction_type": "Recharge"},
+				{"driver": driver_id, "docstatus": 1, "transaction_type": "Recharge", "status": "Completed"},
 				"sum(energy_qty)",
 			)
 			or 0
@@ -282,7 +282,7 @@ def get_energy_kwh_balance_by_driver(driver_id=None):
 		used_kwh = (
 			frappe.get_value(
 				"Energy KWh",
-				{"driver": driver_id, "docstatus": 1, "transaction_type": "Usage"},
+				{"driver": driver_id, "docstatus": 1, "transaction_type": "Usage", "status": "Completed"},
 				"sum(energy_qty)",
 			)
 			or 0
@@ -302,7 +302,6 @@ def get_energy_kwh_balance_by_driver(driver_id=None):
 @frappe.whitelist(allow_guest=False)
 def get_overall_balance(driver_id=None):
 	try:
-		# Changed to driver_id=None so the request.data fallback can actually trigger
 		if not driver_id and frappe.request.data:
 			driver_id = json.loads(frappe.request.data).get("driver_id")
 
@@ -360,29 +359,13 @@ def process_mpesa_express_request(doc):
 		reference_doc = frappe.get_doc(reference_doctype, doc.reference_name)
 
 		# Guard against duplicate triggers on an already-processed record
-		if reference_doc.docstatus != 0:
+		if reference_doc.status == doc.status:
 			return
 
 		try:
 			frappe.db.savepoint("mpesa_express_request")
 
-			if doc.status == "Completed":
-				reference_doc.mpesa_express_request = doc.name
-				reference_doc.save(ignore_permissions=True)
-				reference_doc.submit()
-
-			elif doc.status == "Failed":
-				# Clear the back-reference on Mpesa Express Request first so
-				# Frappe's link integrity check no longer blocks the deletion
-				frappe.db.sql(
-					"""
-					UPDATE `tabMpesa Express Request`
-					SET reference_doctype = NULL, reference_name = NULL
-					WHERE name = %s
-					""",
-					doc.name,
-				)
-				frappe.delete_doc(reference_doctype, reference_doc.name, ignore_permissions=True)
+			frappe.set_value(reference_doctype, doc.reference_name, "status", doc.status)
 
 			frappe.db.commit()
 

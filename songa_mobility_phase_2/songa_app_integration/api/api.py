@@ -194,10 +194,10 @@ def recharge_rental_days():
 				}
 			)
 			rental_days.insert()
+			rental_days.submit()
 
 			if payment_method == "commission":
-				# submit now for recharge based on commission
-				rental_days.submit()
+				frappe.set_value("Rental Days", rental_days.name, "status", "Completed")
 
 				driver_commission_ledger = frappe.get_doc(
 					{
@@ -217,6 +217,7 @@ def recharge_rental_days():
 			elif payment_method == "mpesa":
 				# Rental days have been saved as draft, will be submitted later after payment is confirmed.
 				# Use workflow handlers to check payment status and submit rental days
+				frappe.set_value("Rental Days", rental_days.name, "status", "In Progress")
 				mpesa_express_request = frappe.get_doc(
 					{
 						"doctype": "Mpesa Express Request",
@@ -232,6 +233,10 @@ def recharge_rental_days():
 				)
 				mpesa_express_request.insert()
 				mpesa_express_request.submit()
+
+				frappe.set_value(
+					"Rental Days", rental_days.name, "mpesa_express_request", mpesa_express_request.name
+				)
 
 			frappe.db.commit()
 
@@ -356,10 +361,10 @@ def recharge_kwh():
 				}
 			)
 			energy_kwh.insert()
+			energy_kwh.submit()
 
 			if payment_method == "commission":
-				# submit now for recharge based on commission
-				energy_kwh.submit()
+				frappe.set_value("Energy KWh", energy_kwh.name, "status", "Completed")
 
 				driver_commission_ledger = frappe.get_doc(
 					{
@@ -377,8 +382,7 @@ def recharge_kwh():
 				apply_workflow(driver_commission_ledger, "Approve")
 
 			elif payment_method == "mpesa":
-				# Rental days have been saved as draft, will be submitted later after payment is confirmed.
-				# Use workflow handlers to check payment status and submit rental days
+				frappe.set_value("Energy KWh", energy_kwh.name, "status", "In Progress")
 				mpesa_express_request = frappe.get_doc(
 					{
 						"doctype": "Mpesa Express Request",
@@ -394,6 +398,10 @@ def recharge_kwh():
 				)
 				mpesa_express_request.insert()
 				mpesa_express_request.submit()
+
+				frappe.set_value(
+					"Energy KWh", energy_kwh.name, "mpesa_express_request", mpesa_express_request.name
+				)
 
 			frappe.db.commit()
 
@@ -476,6 +484,7 @@ def consume_rental_days():
 				"posting_date": frappe.utils.nowdate(),
 				"driver": driver,
 				"no_of_days": no_of_days,
+				"status": "Completed",
 				"transaction_type": "Usage",
 			}
 		)
@@ -550,6 +559,7 @@ def consume_kwh():
 				"posting_date": frappe.utils.nowdate(),
 				"driver": driver,
 				"energy_qty": kwh,
+				"status": "Completed",
 				"transaction_type": "Usage",
 			}
 		)
