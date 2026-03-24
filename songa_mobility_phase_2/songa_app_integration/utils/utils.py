@@ -1,6 +1,7 @@
 import json
 
 import frappe
+import requests
 
 
 def get_expense_and_liability_accounts():
@@ -373,15 +374,46 @@ def process_mpesa_express_request(doc):
 			frappe.db.rollback(save_point="mpesa_express_request")
 			raise
 
+		url = frappe.get_single("Songa Customization Settings").songa_webhook_endpoint
+
+		if not url:
+			frappe.log_error(
+				"Songa webhook endpoint not found, please check Songa Customization Settings",
+				"Commission Ledger Workflow",
+			)
+			return
+
+		# initiate logger
+		frappe.utils.logger.set_log_level("INFO")
+		songa_webhook_logger = frappe.logger("songa_webhook_log", allow_site=True, file_count=20)
+
+		return_payload = {
+			"driver_id": reference_doc.driver,
+			"transaction_type": reference_doc.transaction_type,
+			"amount": reference_doc.amount,
+			"mpesa_express_request": doc.name,
+		}
+
+		headers = {"Content-Type": "application/json"}
+
 		if doc.status == "Completed":
-			balance = (
-				get_rental_days_balance_by_driver(driver_id=reference_doc.driver).get("total_rental_days", 0)
-				if reference_doctype == "Rental Days"
-				else get_energy_kwh_balance_by_driver(driver_id=reference_doc.driver).get("total_kwh", 0)
-			)
-			frappe.logger().info(
-				f"{reference_doctype} recharged for driver {reference_doc.driver}. " f"New balance: {balance}"
-			)
+			if reference_doctype == "Rental Days":
+				return_payload["usage"] = "Rental days recharge"
+				return_payload["rental_days_balance"] = get_rental_days_balance_by_driver(
+					driver_id=reference_doc.driver
+				)
+			elif reference_doctype == "Energy KWh":
+				return_payload["usage"] = "Energy recharge"
+				return_payload["energy_kwh_balance"] = get_energy_kwh_balance_by_driver(
+					driver_id=reference_doc.driver
+				)
+
+			data = json.dumps(return_payload)
+			response = requests.post(url, data=data, headers=headers, verify=True)
+			if response.status_code != 200:
+				frappe.log_error(f"{response}", "Error sending data to webhook endpoint")
+				return
+			songa_webhook_logger.info(f"Mpesa Express Request: {doc.name}. Response: {response}\n")
 		else:
 			frappe.logger().info(
 				f"{reference_doctype} recharge cancelled for driver {reference_doc.driver} "

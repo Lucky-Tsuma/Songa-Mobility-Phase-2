@@ -53,8 +53,6 @@ def handle_commission_ledger_workflow(doc, method):
 					driver_id=doc.driver
 				)
 
-			return_payload["deducted_amount"] = doc.amount
-
 		data = json.dumps(return_payload)
 		response = requests.post(url, data=data, headers=headers, verify=True)
 		if response.status_code != 200:
