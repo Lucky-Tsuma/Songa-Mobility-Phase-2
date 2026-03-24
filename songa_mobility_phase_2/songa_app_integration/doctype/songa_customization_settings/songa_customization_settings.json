@@ -9,6 +9,9 @@
   "expense_account",
   "column_break_lpcu",
   "liability_account",
+  "section_break_ccog",
+  "songa_webhook_endpoint",
+  "column_break_bsdk",
   "section_break_bvvf",
   "stk_push_payment_gateway",
   "column_break_gpea"
@@ -48,13 +51,29 @@
   {
    "fieldname": "column_break_gpea",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_ccog",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "songa_webhook_endpoint",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Songa Webhook Endpoint",
+   "options": "URL",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_bsdk",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-15 18:09:28.481704",
+ "modified": "2026-03-24 15:46:39.769948",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Songa Customization Settings",
