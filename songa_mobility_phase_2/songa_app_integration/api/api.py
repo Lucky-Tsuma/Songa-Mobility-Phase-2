@@ -581,3 +581,13 @@ def consume_kwh():
 	except Exception as e:
 		frappe.local.response["http_status_code"] = 500
 		return {"status": "error", "message": str(e)}
+
+
+@frappe.whitelist(allow_guest=False)
+def cancel_rental_days():
+	return {"status": "success", "message": "Endpoint will be used to cancel rental_days."}
+
+
+@frappe.whitelist(allow_guest=False)
+def cancel_energy_kwh():
+	return {"status": "success", "message": "Endpoint will be used to cancel energy_kwh"}
