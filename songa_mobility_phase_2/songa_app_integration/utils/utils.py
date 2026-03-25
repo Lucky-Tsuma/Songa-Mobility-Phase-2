@@ -202,15 +202,32 @@ def get_commission_balance_by_driver(driver_id=None):
 		if not supplier:
 			frappe.throw("Driver does not have an associated supplier")
 
-		expense_account, _ = get_expense_and_liability_accounts()
+		customer = frappe.db.get_value("Driver", driver_id, "customer")
 
-		balance = frappe.get_list(
-			"GL Entry",
-			filters={"against": supplier, "account": expense_account},
-			fields=["sum(debit) - sum(credit) as balance"],
+		if not customer:
+			frappe.throw("Driver does not have an associated customer")
+
+		expense_account, liability_account = get_expense_and_liability_accounts()
+
+		expense_balance = (
+			frappe.get_list(
+				"GL Entry",
+				filters={"against": supplier, "account": expense_account},
+				fields=["sum(debit) - sum(credit) as balance"],
+			)[0].balance
+			or 0
 		)
 
-		return {"status": "success", "balance": balance[0].balance or 0}
+		liability_balance = (
+			frappe.get_list(
+				"GL Entry",
+				filters={"against": supplier, "account": liability_account},
+				fields=["sum(debit) - sum(credit) as balance"],
+			)[0].balance
+			or 0
+		)
+
+		return {"status": "success", "balance": expense_balance - liability_balance}
 	except frappe.ValidationError:
 		raise
 	except Exception as e:
