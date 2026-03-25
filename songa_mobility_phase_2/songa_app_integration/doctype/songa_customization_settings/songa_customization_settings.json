@@ -6,55 +6,25 @@
  "engine": "InnoDB",
  "field_order": [
   "driver_commission_accounts_section",
-  "expense_account",
-  "column_break_lpcu",
-  "liability_account",
-  "section_break_ccog",
-  "songa_webhook_endpoint",
-  "column_break_bsdk",
-  "section_break_bvvf",
+  "driver_commission_account",
   "stk_push_payment_gateway",
-  "column_break_gpea"
+  "column_break_lpcu",
+  "songa_webhook_endpoint"
  ],
  "fields": [
   {
    "fieldname": "driver_commission_accounts_section",
-   "fieldtype": "Section Break",
-   "label": "Driver commission accounts"
-  },
-  {
-   "fieldname": "expense_account",
-   "fieldtype": "Link",
-   "label": "Expense account",
-   "options": "Account"
+   "fieldtype": "Section Break"
   },
   {
    "fieldname": "column_break_lpcu",
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "liability_account",
-   "fieldtype": "Link",
-   "label": "Liability Account",
-   "options": "Account"
-  },
-  {
-   "fieldname": "section_break_bvvf",
-   "fieldtype": "Section Break"
-  },
-  {
    "fieldname": "stk_push_payment_gateway",
    "fieldtype": "Link",
    "label": "STK Push payment gateway",
    "options": "Payment Gateway"
-  },
-  {
-   "fieldname": "column_break_gpea",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "section_break_ccog",
-   "fieldtype": "Section Break"
   },
   {
    "fieldname": "songa_webhook_endpoint",
@@ -65,15 +35,18 @@
    "reqd": 1
   },
   {
-   "fieldname": "column_break_bsdk",
-   "fieldtype": "Column Break"
+   "fieldname": "driver_commission_account",
+   "fieldtype": "Link",
+   "label": "Driver Commission Account",
+   "options": "Account",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-24 15:46:39.769948",
+ "modified": "2026-03-25 18:39:43.437692",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Songa Customization Settings",

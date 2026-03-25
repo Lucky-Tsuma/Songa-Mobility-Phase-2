@@ -2,18 +2,32 @@ import json
 
 import frappe
 import requests
+from erpnext.accounts.party import get_party_account
+from erpnext.accounts.utils import get_balance_on
 
 
-def get_expense_and_liability_accounts():
+def get_driver_commission_account():
 	try:
 		settings = frappe.get_single("Songa Customization Settings")
-		expense_account = settings.expense_account
-		liability_account = settings.liability_account
+		driver_commission_account = settings.driver_commission_account
 
-		if not expense_account or not liability_account:
-			frappe.throw("Expense and Liability accounts must be set in Songa Customization Settings")
+		if not driver_commission_account:
+			frappe.throw("Driver Commission account must be set in Songa Customization Settings")
 
-		return expense_account, liability_account
+		return driver_commission_account
+	except frappe.ValidationError:
+		raise
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Accounts Error")
+		frappe.throw(str(e))
+
+
+def get_supplier_party_account(supplier, company):
+	try:
+		if not supplier or not company:
+			frappe.throw("Both supplier and company are needed to get supplier's party account")
+
+		return get_party_account("Supplier", supplier, company)
 	except frappe.ValidationError:
 		raise
 	except Exception as e:
@@ -28,6 +42,7 @@ def allocate_commission(driver_commission_ledger_name):
 		driver = driver_commission_ledger.driver
 		supplier = frappe.db.get_value("Driver", driver, "transporter")
 		amount = driver_commission_ledger.amount
+		company = driver_commission_ledger.company
 
 		if not frappe.db.exists("Driver", driver_commission_ledger.driver):
 			frappe.throw("Driver not found")
@@ -38,7 +53,10 @@ def allocate_commission(driver_commission_ledger_name):
 		if amount <= 0:
 			frappe.throw("Amount must be greater than zero for allocation")
 
-		expense_account, liability_account = get_expense_and_liability_accounts()
+		expense_account, liability_account = (
+			get_driver_commission_account(),
+			get_supplier_party_account(supplier=supplier, company=company),
+		)
 
 		journal_entry = frappe.get_doc(
 			{
@@ -97,6 +115,7 @@ def deduct_commission(driver_commission_ledger_name, rental_days_record_name=Non
 		driver = driver_commission_ledger.driver
 		supplier = frappe.db.get_value("Driver", driver, "transporter")
 		amount = driver_commission_ledger.amount
+		company = driver_commission_ledger.company
 
 		if not frappe.db.exists("Driver", driver_commission_ledger.driver):
 			frappe.throw("Driver not found")
@@ -124,7 +143,10 @@ def deduct_commission(driver_commission_ledger_name, rental_days_record_name=Non
 				f"Insufficient commission balance. Available balance: {commission_balance['balance']}"
 			)
 
-		expense_account, liability_account = get_expense_and_liability_accounts()
+		expense_account, liability_account = (
+			get_driver_commission_account(),
+			get_supplier_party_account(supplier=supplier, company=company),
+		)
 
 		journal_entry = frappe.get_doc(
 			{
@@ -186,13 +208,22 @@ def deduct_commission(driver_commission_ledger_name, rental_days_record_name=Non
 
 
 @frappe.whitelist(allow_guest=False)
-def get_commission_balance_by_driver(driver_id=None):
+def get_commission_balance_by_driver(driver_id=None, company=None):
+	"""Returns the commission payable for a driver"""
 	try:
 		if not driver_id and frappe.request.data:
 			driver_id = json.loads(frappe.request.data).get("driver_id")
 
+		if not company and frappe.request.data:
+			company = json.loads(frappe.request.data).get("company") or frappe.defaults.get_user_default(
+				"company"
+			)
+
 		if not driver_id:
 			frappe.throw("driver_id is required")
+
+		if not company:
+			frappe.throw("company is required")
 
 		if not frappe.db.exists("Driver", driver_id):
 			frappe.throw("Driver not found")
@@ -202,32 +233,11 @@ def get_commission_balance_by_driver(driver_id=None):
 		if not supplier:
 			frappe.throw("Driver does not have an associated supplier")
 
-		customer = frappe.db.get_value("Driver", driver_id, "customer")
-
-		if not customer:
-			frappe.throw("Driver does not have an associated customer")
-
-		expense_account, liability_account = get_expense_and_liability_accounts()
-
-		expense_balance = (
-			frappe.get_list(
-				"GL Entry",
-				filters={"against": supplier, "account": expense_account},
-				fields=["sum(debit) - sum(credit) as balance"],
-			)[0].balance
-			or 0
+		balance = -get_balance_on(
+			party_type="Supplier", party=supplier, date=frappe.utils.today(), company=company
 		)
 
-		liability_balance = (
-			frappe.get_list(
-				"GL Entry",
-				filters={"against": supplier, "account": liability_account},
-				fields=["sum(debit) - sum(credit) as balance"],
-			)[0].balance
-			or 0
-		)
-
-		return {"status": "success", "balance": expense_balance - liability_balance}
+		return {"status": "success", "balance": balance}
 	except frappe.ValidationError:
 		raise
 	except Exception as e:
