@@ -583,11 +583,88 @@ def consume_kwh():
 		return {"status": "error", "message": str(e)}
 
 
+def _cancel_document(doctype, document_id, id_field):
+	if not frappe.db.exists(doctype, document_id):
+		frappe.local.response["http_status_code"] = 404
+		return {"status": "error", "message": f"{doctype} not found"}
+
+	doc = frappe.get_doc(doctype, document_id)
+
+	if doc.docstatus == 0:
+		frappe.local.response["http_status_code"] = 400
+		return {"status": "error", "message": f"{doctype} is not submitted"}
+
+	if doc.docstatus == 2:
+		frappe.local.response["http_status_code"] = 200
+		return {"status": "success", "message": f"{doctype} is already cancelled. ID: {document_id}"}
+
+	savepoint = f"cancel_{id_field}"
+	frappe.db.savepoint(savepoint)
+
+	try:
+		doc.flags.ignore_links = True
+		doc.cancel()
+
+		if doc.driver_commission_ledger:
+			driver_commission_ledger = frappe.get_doc(
+				"Driver Commission Ledger", doc.driver_commission_ledger
+			)
+			journal_entry = frappe.get_doc("Journal Entry", driver_commission_ledger.journal_entry)
+
+			apply_workflow(driver_commission_ledger, "Cancel")
+			journal_entry.flags.ignore_links = True
+			journal_entry.cancel()
+		elif doc.mpesa_express_request:
+			mpesa_express_request = frappe.get_doc("Mpesa Express Request", doc.mpesa_express_request)
+			mpesa_express_request.flags.ignore_links = True
+			mpesa_express_request.cancel()
+
+	except Exception:
+		frappe.db.rollback(save_point=savepoint)
+		raise
+
+	frappe.db.commit()
+
+	return {"status": "success", "message": f"{doctype} cancelled successfully. ID: {document_id}"}
+
+
 @frappe.whitelist(allow_guest=False)
 def cancel_rental_days():
-	return {"status": "success", "message": "Endpoint will be used to cancel rental_days."}
+	try:
+		data = check_for_empty_payload()
+
+		if isinstance(data, dict) and data.get("status") == "error":
+			return data
+
+		check_for_empty_values(data, ["rental_day_id"])
+
+		return _cancel_document("Rental Days", data.get("rental_day_id"), "rental_day_id")
+
+	except frappe.PermissionError:
+		frappe.local.response["http_status_code"] = 403
+		return {"status": "error", "message": "You do not have permission to cancel this record"}
+	except Exception as e:
+		frappe.db.rollback()
+		frappe.local.response["http_status_code"] = 500
+		return {"status": "error", "message": str(e)}
 
 
 @frappe.whitelist(allow_guest=False)
 def cancel_energy_kwh():
-	return {"status": "success", "message": "Endpoint will be used to cancel energy_kwh"}
+	try:
+		data = check_for_empty_payload()
+
+		if isinstance(data, dict) and data.get("status") == "error":
+			return data
+
+		check_for_empty_values(data, ["energy_kwh_id"])
+
+		return _cancel_document("Energy KWh", data.get("energy_kwh_id"), "energy_kwh_id")
+
+	except frappe.PermissionError:
+		frappe.local.response["http_status_code"] = 403
+		return {"status": "error", "message": "You do not have permission to cancel this record"}
+	except Exception as e:
+		frappe.db.rollback()
+		frappe.local.response["http_status_code"] = 500
+		return {"status": "error", "message": str(e)}
