@@ -246,11 +246,11 @@ scheduler_events = {
 # }
 
 fixtures = [
-	"Wallet Type",
 	{
 		"dt": "Custom Field",
 		"filters": {"module": ["in", ["Songa App Integration", "Songa Mobility Phase 2"]]},
 	},
 	{"dt": "Workflow", "filters": {"document_type": ["in", ["Driver Commission Ledger"]]}},
-	{"dt": "Role", "filters": {"name": ["in", ["Wallet Approver"]]}},
+	{"dt": "Role", "filters": {"name": ["in", ["Songa App"]]}},
+	"Custom DocPerm",
 ]
