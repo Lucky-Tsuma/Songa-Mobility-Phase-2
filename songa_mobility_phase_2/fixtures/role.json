@@ -6,10 +6,10 @@
   "doctype": "Role",
   "home_page": null,
   "is_custom": 0,
-  "modified": "2026-02-24 11:40:40.625359",
-  "name": "Wallet Approver",
+  "modified": "2026-03-26 11:21:49.910389",
+  "name": "Songa App",
   "restrict_to_domain": null,
-  "role_name": "Wallet Approver",
+  "role_name": "Songa App",
   "two_factor_auth": 0
  }
 ]
