@@ -44,7 +44,7 @@ def handle_commission_ledger_workflow(doc, method):
 
 		if doc.transaction_type == "Deduction":
 			usage = doc.usage
-			return_payload["usage"] = usage
+			return_payload["action_type"] = usage
 
 			if usage == "Energy recharge":
 				return_payload["energy_kwh_balance"] = get_energy_kwh_balance_by_driver(driver_id=doc.driver)
@@ -52,6 +52,8 @@ def handle_commission_ledger_workflow(doc, method):
 				return_payload["rental_days_balance"] = get_rental_days_balance_by_driver(
 					driver_id=doc.driver
 				)
+		elif doc.transaction_type == "Allocation":
+			return_payload["action_type"] = "Approved Commission"
 
 		data = json.dumps(return_payload)
 		response = requests.post(url, data=data, headers=headers, verify=True)

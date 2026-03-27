@@ -425,12 +425,12 @@ def process_mpesa_express_request(doc):
 
 		if doc.status == "Completed":
 			if reference_doctype == "Rental Days":
-				return_payload["usage"] = "Rental days recharge"
+				return_payload["action_type"] = "Rental days recharge"
 				return_payload["rental_days_balance"] = get_rental_days_balance_by_driver(
 					driver_id=reference_doc.driver
 				)
 			elif reference_doctype == "Energy KWh":
-				return_payload["usage"] = "Energy recharge"
+				return_payload["action_type"] = "Energy recharge"
 				return_payload["energy_kwh_balance"] = get_energy_kwh_balance_by_driver(
 					driver_id=reference_doc.driver
 				)
