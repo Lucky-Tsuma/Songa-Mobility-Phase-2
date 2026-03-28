@@ -1,0 +1,135 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2025-12-12 23:47:58.713026",
+  "name": "Send for Approval AM",
+  "workflow_action_name": "Send for Approval AM"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2025-12-12 23:47:58.737816",
+  "name": "Cancel",
+  "workflow_action_name": "Cancel"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2025-12-12 23:47:58.744906",
+  "name": "Send for Approval GM",
+  "workflow_action_name": "Send for Approval GM"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2025-12-12 23:47:58.763307",
+  "name": "Return for Amendment",
+  "workflow_action_name": "Return for Amendment"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2025-12-12 23:47:58.769346",
+  "name": "Send for Approval HM",
+  "workflow_action_name": "Send for Approval HM"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-01-07 10:41:50.312042",
+  "name": "Send for Approval PM",
+  "workflow_action_name": "Send for Approval PM"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-01-08 10:44:12.975495",
+  "name": "Recall",
+  "workflow_action_name": "Recall"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-01-19 13:36:11.819535",
+  "name": "Submit For Approval",
+  "workflow_action_name": "Submit For Approval"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-01-19 13:52:06.033707",
+  "name": "Submit Return for Approval",
+  "workflow_action_name": "Submit Return for Approval"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-01-19 13:52:31.215706",
+  "name": "Approve Return",
+  "workflow_action_name": "Approve Return"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-01-19 13:52:41.206657",
+  "name": "Reject Return",
+  "workflow_action_name": "Reject Return"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-01-19 13:55:29.565852",
+  "name": "Submit to Target HM",
+  "workflow_action_name": "Submit to Target HM"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-03-28 17:59:51.398510",
+  "name": "Commence service",
+  "workflow_action_name": "Commence service"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-03-28 18:00:31.175493",
+  "name": "Complete",
+  "workflow_action_name": "Complete"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2025-12-12 23:47:58.755333",
+  "name": "Send for Approval OP",
+  "workflow_action_name": "Send for Approval OP"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2024-03-06 20:09:15.715826",
+  "name": "Review",
+  "workflow_action_name": "Review"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2024-10-28 12:30:09.751370",
+  "name": "Submit",
+  "workflow_action_name": "Submit"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2024-03-06 20:09:15.713367",
+  "name": "Approve",
+  "workflow_action_name": "Approve"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2024-03-06 20:09:15.714708",
+  "name": "Reject",
+  "workflow_action_name": "Reject"
+ }
+]
