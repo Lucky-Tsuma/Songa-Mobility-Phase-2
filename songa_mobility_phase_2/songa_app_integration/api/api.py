@@ -672,5 +672,51 @@ def cancel_energy_kwh():
 
 @frappe.whitelist(allow_guest=False)
 def create_service_entry():
-	# TODO: Complete this endpoint
-	return {"success": "Endpoint will be used to create Service Entry"}
+	try:
+		data = check_for_empty_payload()
+
+		if isinstance(data, dict) and data.get("status") == "error":
+			return data
+
+		check_for_empty_values(data, ["service_entry_id", "description", "username"])
+
+		service_entry_id = data.get("service_entry_id")
+		username = data.get("username")
+		description = data.get("description")
+		trike_id = data.get("trike_id", "")
+		asset = data.get("asset", "")
+
+		if not frappe.db.exists("User", username):
+			frappe.local.response["http_status_code"] = 404
+			return {"status": "error", "message": "User not found"}
+
+		if frappe.db.exists("Service Entry", service_entry_id):
+			frappe.local.response["http_status_code"] = 200
+			return {
+				"status": "success",
+				"message": "Duplicate Service Entry",
+				"service_entry_id": service_entry_id,
+			}
+
+		# setting the username here, so its easy to identify who created the service entry and will need updates
+		frappe.set_user(username)
+
+		service_entry = frappe.new_doc("Service Entry")
+		service_entry.name = service_entry_id
+		service_entry.trike_id = trike_id
+		service_entry.asset = asset
+		service_entry.description = description
+		service_entry.user = username
+
+		service_entry.save(ignore_permissions=True)
+
+		return {
+			"status": "success",
+			"message": "Service Entry created successfully.",
+			"service_entry_id": service_entry.name,
+		}
+	except Exception as e:
+		frappe.local.response["http_status_code"] = 500
+		return {"status": "error", "message": str(e)}
+	finally:
+		frappe.set_user("Administrator")
