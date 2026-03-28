@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "format:SE-{#####}",
+ "autoname": "prompt",
  "creation": "2026-03-28 16:22:32.387551",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -105,7 +105,8 @@
   {
    "fieldname": "description",
    "fieldtype": "Text",
-   "label": "Description"
+   "label": "Description",
+   "reqd": 1
   },
   {
    "allow_on_submit": 1,
@@ -136,11 +137,11 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-28 17:52:49.897429",
+ "modified": "2026-03-28 22:35:07.204006",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Service Entry",
- "naming_rule": "Expression",
+ "naming_rule": "Set by user",
  "owner": "Administrator",
  "permissions": [
   {
