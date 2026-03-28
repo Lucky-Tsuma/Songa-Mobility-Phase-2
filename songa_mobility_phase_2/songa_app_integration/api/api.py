@@ -668,3 +668,9 @@ def cancel_energy_kwh():
 		frappe.db.rollback()
 		frappe.local.response["http_status_code"] = 500
 		return {"status": "error", "message": str(e)}
+
+
+@frappe.whitelist(allow_guest=False)
+def create_service_entry():
+	# TODO: Complete this endpoint
+	return {"success": "Endpoint will be used to create Service Entry"}
