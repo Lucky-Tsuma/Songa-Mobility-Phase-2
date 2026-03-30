@@ -21,9 +21,7 @@ def clean_comment(html):
 
 
 def on_comment_update(doc, method):
-	if (
-		doc.comment_type == "Comment" and doc.reference_doctype == "Service Entry"
-	):  # filter out system/likes/etc.
+	if doc.comment_type == "Comment" and doc.reference_doctype == "Service Entry" and doc.published == 0:
 		try:
 			clean_content = clean_comment(doc.content)
 			url = frappe.get_single("Songa Customization Settings").songa_webhook_endpoint
@@ -35,7 +33,6 @@ def on_comment_update(doc, method):
 				)
 				return
 
-			# initiate logger
 			frappe.utils.logger.set_log_level("INFO")
 			songa_webhook_logger = frappe.logger("songa_webhook_log", allow_site=True, file_count=20)
 
@@ -48,9 +45,7 @@ def on_comment_update(doc, method):
 			}
 
 			data = json.dumps(payload)
-
 			headers = {"Content-Type": "application/json"}
-
 			response = requests.post(url, data=data, headers=headers, verify=True)
 
 			if response.status_code != 200:
@@ -63,6 +58,18 @@ def on_comment_update(doc, method):
 			songa_webhook_logger.info(
 				f"New comment on {doc.reference_doctype} - {doc.reference_name} by {doc.owner}. Content: {clean_content}\n"
 			)
+
+			frappe.db.savepoint("comment_published_update")
+			try:
+				frappe.set_value("Comment", doc.name, "published", 1)
+				frappe.db.commit()
+			except Exception:
+				frappe.db.rollback(save_point="comment_published_update")
+				frappe.log_error(
+					f"Rolled back published flag update for {doc.reference_doctype} - {doc.reference_name}",
+					"Service Entry Comment",
+				)
+				raise
 
 		except Exception as e:
 			frappe.log_error(
