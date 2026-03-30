@@ -720,3 +720,36 @@ def create_service_entry():
 		return {"status": "error", "message": str(e)}
 	finally:
 		frappe.set_user("Administrator")
+
+
+@frappe.whitelist(allow_guest=False)
+def check_service_entry_status():
+	try:
+		data = check_for_empty_payload()
+
+		if isinstance(data, dict) and data.get("status") == "error":
+			return data
+
+		check_for_empty_values(data, ["service_entry_id"])
+
+		service_entry_id = data.get("service_entry_id")
+
+		if not frappe.db.exists("Service Entry", service_entry_id):
+			frappe.local.response["http_status_code"] = 404
+			return {"status": "error", "message": "Service Entry not found"}
+
+		service_entry = frappe.get_doc("Service Entry", service_entry_id)
+
+		message = {
+			"service_entry_id": service_entry.name,
+			"service_entry_status": service_entry.status,
+			"trike_id": service_entry.trike_id,
+			"asset": service_entry.asset,
+			"asset_name": service_entry.asset_name,
+			"description": service_entry.description,
+		}
+
+		return {"status": "success", "message": message}
+	except Exception as e:
+		frappe.local.response["http_status_code"] = 500
+		return {"status": "error", "message": str(e)}
