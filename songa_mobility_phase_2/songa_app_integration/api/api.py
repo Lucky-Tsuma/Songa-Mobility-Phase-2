@@ -753,3 +753,47 @@ def check_service_entry_status():
 	except Exception as e:
 		frappe.local.response["http_status_code"] = 500
 		return {"status": "error", "message": str(e)}
+
+
+@frappe.whitelist(allow_guest=False)
+def comment_on_service_entry():
+	try:
+		data = check_for_empty_payload()
+
+		if isinstance(data, dict) and data.get("status") == "error":
+			return data
+
+		check_for_empty_values(data, ["service_entry_id", "comment", "username"])
+
+		service_entry_id = data.get("service_entry_id")
+		username = data.get("username")
+		comment = data.get("comment")
+
+		if not frappe.db.exists("User", username):
+			frappe.local.response["http_status_code"] = 404
+			return {"status": "error", "message": "User not found"}
+
+		if not frappe.db.exists("Service Entry", service_entry_id):
+			frappe.local.response["http_status_code"] = 404
+			return {"status": "error", "message": "Service Entry not found"}
+
+		frappe.set_user(username)
+
+		doc = frappe.get_doc(
+			{
+				"doctype": "Comment",
+				"comment_type": "Comment",
+				"reference_doctype": "Service Entry",
+				"reference_name": service_entry_id,
+				"content": comment,
+				"published": 1,
+			}
+		)
+		doc.insert(ignore_permissions=True)
+
+		return {"status": "success", "message": "Comment added successfully."}
+	except Exception as e:
+		frappe.local.response["http_status_code"] = 500
+		return {"status": "error", "message": str(e)}
+	finally:
+		frappe.set_user("Administrator")
