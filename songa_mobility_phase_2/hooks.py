@@ -255,7 +255,7 @@ fixtures = [
 	},
 	{"dt": "Workflow", "filters": {"document_type": ["in", ["Driver Commission Ledger"]]}},
 	{"dt": "Role", "filters": {"name": ["in", ["Songa App", "Commission Ledger Approver"]]}},
-	# {"dt": "Notification", "filters": {"document_type": ["in", ["Service Entry"]]}},
+	{"dt": "Notification", "filters": {"document_type": ["in", ["Asset Repair"]]}},
 	"Workflow State",
 	"Workflow Action Master",
 	"Custom DocPerm",
