@@ -789,16 +789,16 @@ def check_asset_repair_status():
 
 
 @frappe.whitelist(allow_guest=False)
-def comment_on_service_entry():
+def comment_on_asset_repair():
 	try:
 		data = check_for_empty_payload()
 
 		if isinstance(data, dict) and data.get("status") == "error":
 			return data
 
-		check_for_empty_values(data, ["service_entry_id", "comment", "username"])
+		check_for_empty_values(data, ["asset_repair_id", "comment", "username"])
 
-		service_entry_id = data.get("service_entry_id")
+		asset_repair_id = data.get("asset_repair_id")
 		username = data.get("username")
 		comment = data.get("comment")
 
@@ -806,18 +806,20 @@ def comment_on_service_entry():
 			frappe.local.response["http_status_code"] = 404
 			return {"status": "error", "message": "User not found"}
 
-		if not frappe.db.exists("Service Entry", service_entry_id):
+		if not frappe.db.exists("Asset Repair", {"custom_asset_repair_id": asset_repair_id}):
 			frappe.local.response["http_status_code"] = 404
-			return {"status": "error", "message": "Service Entry not found"}
+			return {"status": "error", "message": "Asset Repair not found"}
 
 		frappe.set_user(username)
+
+		reference_name = frappe.db.get_value("Asset Repair", {"custom_asset_repair_id": asset_repair_id}, "name")
 
 		doc = frappe.get_doc(
 			{
 				"doctype": "Comment",
 				"comment_type": "Comment",
-				"reference_doctype": "Service Entry",
-				"reference_name": service_entry_id,
+				"reference_doctype": "Asset Repair",
+				"reference_name": reference_name,
 				"content": comment,
 				"published": 1,
 			}

@@ -21,7 +21,7 @@ def clean_comment(html):
 
 
 def on_comment_update(doc, method):
-	if doc.comment_type == "Comment" and doc.reference_doctype == "Service Entry" and doc.published == 0:
+	if doc.comment_type == "Comment" and doc.reference_doctype == "Asset Repair" and doc.published == 0:
 		try:
 			clean_content = clean_comment(doc.content)
 			url = frappe.get_single("Songa Customization Settings").songa_webhook_endpoint
@@ -29,16 +29,21 @@ def on_comment_update(doc, method):
 			if not url:
 				frappe.log_error(
 					"Songa webhook endpoint not found, please check Songa Customization Settings",
-					"Service Entry Comment",
+					"Asset Repair Comment",
 				)
 				return
 
 			frappe.utils.logger.set_log_level("INFO")
 			songa_webhook_logger = frappe.logger("songa_webhook_log", allow_site=True, file_count=20)
 
+			asset_repair_id = frappe.db.get_value(
+				"Asset Repair", doc.reference_name, "custom_asset_repair_id"
+			) or doc.reference_name
+
 			payload = {
-				"action_type": "service_entry_comment",
-				"service_entry": doc.reference_name,
+				"action_type": "asset_repair_comment",
+				"asset_repair": doc.reference_name,
+				"asset_repair_id": asset_repair_id,
 				"comment": clean_content,
 				"comment_owner": doc.owner,
 				"comment_timestamp": doc.creation,
@@ -51,7 +56,7 @@ def on_comment_update(doc, method):
 			if response.status_code != 200:
 				frappe.log_error(
 					f"Failed to send comment to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
-					"Service Entry Comment",
+					"Asset Repair Comment",
 				)
 				return
 
@@ -67,13 +72,13 @@ def on_comment_update(doc, method):
 				frappe.db.rollback(save_point="comment_published_update")
 				frappe.log_error(
 					f"Rolled back published flag update for {doc.reference_doctype} - {doc.reference_name}",
-					"Service Entry Comment",
+					"Asset Repair Comment",
 				)
 				raise
 
 		except Exception as e:
 			frappe.log_error(
 				f"Error processing comment for {doc.reference_doctype} - {doc.reference_name}: {e!s}",
-				"Service Entry Comment",
+				"Asset Repair Comment",
 			)
 			raise
