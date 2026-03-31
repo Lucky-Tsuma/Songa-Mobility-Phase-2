@@ -677,17 +677,17 @@ def create_asset_repair():
         if isinstance(data, dict) and data.get("status") == "error":
             return data
 
-        check_for_empty_values(data, ["asset_repair_id", "failure_date", "description", "asset_id", "asset_type_id", "username"])
+        check_for_empty_values(data, ["asset_repair_id", "failure_date", "description", "asset_id", "asset_type_id", "user_email"])
 
         asset_repair_id = data.get("asset_repair_id")
-        username = data.get("username")
+        user_email = data.get("user_email")
         description = data.get("description")
         asset_id = data.get("asset_id")
         asset_type_id = data.get("asset_type_id")
         failure_date = data.get("failure_date")
         company = data.get("company")
 
-        if not frappe.db.exists("User", username):
+        if not frappe.db.exists("User", user_email):
             frappe.local.response["http_status_code"] = 404
             return {"status": "error", "message": "User not found"}
 
@@ -703,8 +703,8 @@ def create_asset_repair():
         frappe.db.savepoint(savepoint)
 
         try:
-            # setting the username here, so its easy to identify who created the asset repair and will need updates
-            frappe.set_user(username)
+            # setting the user_email here, so its easy to identify who created the asset repair and will need updates
+            frappe.set_user(user_email)
 
             asset_repair = frappe.new_doc("Asset Repair")
             asset_repair.company = company or frappe.defaults.get_user_default("company")
@@ -796,13 +796,13 @@ def comment_on_asset_repair():
 		if isinstance(data, dict) and data.get("status") == "error":
 			return data
 
-		check_for_empty_values(data, ["asset_repair_id", "comment", "username"])
+		check_for_empty_values(data, ["asset_repair_id", "comment", "user_email"])
 
 		asset_repair_id = data.get("asset_repair_id")
-		username = data.get("username")
+		user_email = data.get("user_email")
 		comment = data.get("comment")
 
-		if not frappe.db.exists("User", username):
+		if not frappe.db.exists("User", user_email):
 			frappe.local.response["http_status_code"] = 404
 			return {"status": "error", "message": "User not found"}
 
@@ -810,7 +810,7 @@ def comment_on_asset_repair():
 			frappe.local.response["http_status_code"] = 404
 			return {"status": "error", "message": "Asset Repair not found"}
 
-		frappe.set_user(username)
+		frappe.set_user(user_email)
 
 		reference_name = frappe.db.get_value("Asset Repair", {"custom_asset_repair_id": asset_repair_id}, "name")
 
