@@ -144,6 +144,9 @@ doc_events = {
 	"Comment": {
 		"on_update": "songa_mobility_phase_2.songa_app_integration.events.events.on_comment_update",
 	},
+	"Asset Repair": {
+		"on_update": "songa_mobility_phase_2.songa_app_integration.events.events.on_asset_repair_update",
+	},
 }
 
 # Scheduled Tasks
