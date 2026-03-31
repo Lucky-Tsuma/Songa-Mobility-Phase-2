@@ -671,55 +671,70 @@ def cancel_energy_kwh():
 
 
 @frappe.whitelist(allow_guest=False)
-def create_service_entry():
-	try:
-		data = check_for_empty_payload()
+def create_asset_repair():
+    try:
+        data = check_for_empty_payload()
+        if isinstance(data, dict) and data.get("status") == "error":
+            return data
 
-		if isinstance(data, dict) and data.get("status") == "error":
-			return data
+        check_for_empty_values(data, ["asset_repair_id", "failure_date", "description", "asset_id", "asset_type_id", "username"])
 
-		check_for_empty_values(data, ["service_entry_id", "description", "username"])
+        asset_repair_id = data.get("asset_repair_id")
+        username = data.get("username")
+        description = data.get("description")
+        asset_id = data.get("asset_id")
+        asset_type_id = data.get("asset_type_id")
+        failure_date = data.get("failure_date")
+		company = data.get("company")
 
-		service_entry_id = data.get("service_entry_id")
-		username = data.get("username")
-		description = data.get("description")
-		trike_id = data.get("trike_id", "")
-		asset = data.get("asset", "")
+        if not frappe.db.exists("User", username):
+            frappe.local.response["http_status_code"] = 404
+            return {"status": "error", "message": "User not found"}
 
-		if not frappe.db.exists("User", username):
-			frappe.local.response["http_status_code"] = 404
-			return {"status": "error", "message": "User not found"}
+        if frappe.db.exists("Asset Repair", {"custom_asset_repair_id": asset_repair_id}):
+            frappe.local.response["http_status_code"] = 200
+            return {
+                "status": "success",
+                "message": "Duplicate Asset Repair",
+                "asset_repair_id": asset_repair_id,
+            }
 
-		if frappe.db.exists("Service Entry", service_entry_id):
-			frappe.local.response["http_status_code"] = 200
-			return {
-				"status": "success",
-				"message": "Duplicate Service Entry",
-				"service_entry_id": service_entry_id,
-			}
+        savepoint = "create_asset_repair"
+        frappe.db.savepoint(savepoint)
 
-		# setting the username here, so its easy to identify who created the service entry and will need updates
-		frappe.set_user(username)
+        try:
+            # setting the username here, so its easy to identify who created the asset repair and will need updates
+            frappe.set_user(username)
 
-		service_entry = frappe.new_doc("Service Entry")
-		service_entry.name = service_entry_id
-		service_entry.trike_id = trike_id
-		service_entry.asset = asset
-		service_entry.description = description
-		service_entry.user = username
+            asset_repair = frappe.new_doc("Asset Repair")
+			asset_repair.company = company or frappe.defaults.get_user_default("company")
+            asset_repair.custom_asset_repair_id = asset_repair_id
+            asset_repair.asset = asset_id
+            asset_repair.custom_asset_type_id = asset_type_id
+            asset_repair.description = description
+            asset_repair.failure_date = frappe.utils.getdate(failure_date)
+            asset_repair.insert(ignore_permissions=True)
 
-		service_entry.save(ignore_permissions=True)
+            apply_workflow(asset_repair, "Send for Approval HM")
 
-		return {
-			"status": "success",
-			"message": "Service Entry created successfully.",
-			"service_entry_id": service_entry.name,
-		}
-	except Exception as e:
-		frappe.local.response["http_status_code"] = 500
-		return {"status": "error", "message": str(e)}
-	finally:
-		frappe.set_user("Administrator")
+            frappe.db.commit()
+
+            return {
+                "status": "success",
+                "message": "Asset Repair created successfully.",
+                "asset_repair_id": asset_repair.custom_asset_repair_id,
+            }
+
+        except Exception as e:
+            frappe.db.rollback(save_point=savepoint)
+            raise
+
+    except Exception as e:
+        frappe.local.response["http_status_code"] = 500
+        return {"status": "error", "message": str(e)}
+
+    finally:
+        frappe.set_user("Administrator")
 
 
 @frappe.whitelist(allow_guest=False)
