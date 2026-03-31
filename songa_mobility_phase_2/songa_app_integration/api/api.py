@@ -685,7 +685,7 @@ def create_asset_repair():
         asset_id = data.get("asset_id")
         asset_type_id = data.get("asset_type_id")
         failure_date = data.get("failure_date")
-		company = data.get("company")
+        company = data.get("company")
 
         if not frappe.db.exists("User", username):
             frappe.local.response["http_status_code"] = 404
@@ -707,7 +707,7 @@ def create_asset_repair():
             frappe.set_user(username)
 
             asset_repair = frappe.new_doc("Asset Repair")
-			asset_repair.company = company or frappe.defaults.get_user_default("company")
+            asset_repair.company = company or frappe.defaults.get_user_default("company")
             asset_repair.custom_asset_repair_id = asset_repair_id
             asset_repair.asset = asset_id
             asset_repair.custom_asset_type_id = asset_type_id
@@ -725,7 +725,7 @@ def create_asset_repair():
                 "asset_repair_id": asset_repair.custom_asset_repair_id,
             }
 
-        except Exception as e:
+        except Exception:
             frappe.db.rollback(save_point=savepoint)
             raise
 
@@ -738,31 +738,49 @@ def create_asset_repair():
 
 
 @frappe.whitelist(allow_guest=False)
-def check_service_entry_status():
+def check_asset_repair_status():
 	try:
 		data = check_for_empty_payload()
 
 		if isinstance(data, dict) and data.get("status") == "error":
 			return data
 
-		check_for_empty_values(data, ["service_entry_id"])
+		check_for_empty_values(data, ["asset_repair_id"])
 
-		service_entry_id = data.get("service_entry_id")
+		asset_repair_id = data.get("asset_repair_id")
 
-		if not frappe.db.exists("Service Entry", service_entry_id):
+		if not frappe.db.exists("Asset Repair", {"custom_asset_repair_id": asset_repair_id}):
 			frappe.local.response["http_status_code"] = 404
-			return {"status": "error", "message": "Service Entry not found"}
+			return {"status": "error", "message": f"Asset Repair not found. ID: {asset_repair_id}"}
 
-		service_entry = frappe.get_doc("Service Entry", service_entry_id)
+		asset_repair = frappe.get_doc("Asset Repair", { "custom_asset_repair_id": asset_repair_id })
 
 		message = {
-			"service_entry_id": service_entry.name,
-			"service_entry_status": service_entry.status,
-			"trike_id": service_entry.trike_id,
-			"asset": service_entry.asset,
-			"asset_name": service_entry.asset_name,
-			"description": service_entry.description,
+			"asset_repair_id": asset_repair.custom_asset_repair_id,
+			"asset": asset_repair.asset,
+			"asset_name": asset_repair.asset_name,
+			"asset_type": asset_repair.custom_asset_type,
+			"failure_date": asset_repair.failure_date,
+			"completion_date": asset_repair.completion_date,
+			"repair_status": asset_repair.repair_status,
+			"workflow_state": asset_repair.workflow_state,
+			"stock_consumption": asset_repair.stock_consumption,
+			"total_repair_cost": asset_repair.total_repair_cost,
+			"description": asset_repair.description,
+			"actions_performed": asset_repair.actions_performed,
 		}
+
+		if asset_repair.stock_consumption:
+			message["stock_items"] = [
+				{
+					"item_code": item.item_code,
+					"warehouse": item.warehouse,
+					"valuation_rate": item.valuation_rate,
+					"consumed_quantity": item.consumed_quantity,
+					"total_value": item.total_value,
+				}
+				for item in asset_repair.stock_items
+			]
 
 		return {"status": "success", "message": message}
 	except Exception as e:
