@@ -1,0 +1,51 @@
+[
+ {
+  "asset_type": "TRIKE",
+  "docstatus": 0,
+  "doctype": "Asset Type",
+  "modified": "2026-03-31 10:13:46.970644",
+  "name": "1"
+ },
+ {
+  "asset_type": "BATTERY",
+  "docstatus": 0,
+  "doctype": "Asset Type",
+  "modified": "2026-03-31 10:14:18.556978",
+  "name": "2"
+ },
+ {
+  "asset_type": "TILLER",
+  "docstatus": 0,
+  "doctype": "Asset Type",
+  "modified": "2026-03-31 10:14:41.457863",
+  "name": "3"
+ },
+ {
+  "asset_type": "MILLER",
+  "docstatus": 0,
+  "doctype": "Asset Type",
+  "modified": "2026-03-31 10:15:03.312025",
+  "name": "4"
+ },
+ {
+  "asset_type": "THRESHER",
+  "docstatus": 0,
+  "doctype": "Asset Type",
+  "modified": "2026-03-31 10:15:29.934127",
+  "name": "5"
+ },
+ {
+  "asset_type": "WATER_PUMP",
+  "docstatus": 0,
+  "doctype": "Asset Type",
+  "modified": "2026-03-31 10:15:50.186996",
+  "name": "6"
+ },
+ {
+  "asset_type": "CHAUF_CUTTER",
+  "docstatus": 0,
+  "doctype": "Asset Type",
+  "modified": "2026-03-31 10:16:15.210455",
+  "name": "7"
+ }
+]
