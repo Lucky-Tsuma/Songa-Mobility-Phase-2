@@ -233,7 +233,7 @@ def get_commission_balance_by_driver(driver_id=None, company=None):
 		if not supplier:
 			frappe.throw("Driver does not have an associated supplier")
 
-		raw_balance = -get_balance_on(
+		raw_balance = get_balance_on(
 			party_type="Supplier", party=supplier, date=frappe.utils.today(), company=company
 		)
 
