@@ -263,4 +263,5 @@ fixtures = [
 	"Workflow Action Master",
 	"Custom DocPerm",
 	"Asset Type",
+	"Severity Type",
 ]
