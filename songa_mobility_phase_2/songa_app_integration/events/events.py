@@ -85,10 +85,10 @@ def on_comment_update(doc, method):
 
 
 def on_asset_repair_update(doc, method):
-	if not doc.has_value_changed("repair_status"):
+	if not doc.has_value_changed("workflow_state"):
 		return
 
-	if doc.repair_status in ["Completed", "Cancelled"] and doc.repair_status != doc.get_doc_before_save().repair_status:
+	if doc.workflow_state == "Approved" and doc.workflow_state != doc.get_doc_before_save().workflow_state:
 		try:
 			url = frappe.get_single("Songa Customization Settings").songa_webhook_endpoint
 
@@ -111,8 +111,8 @@ def on_asset_repair_update(doc, method):
 				"asset_name": doc.asset_name,
 				"asset_type": doc.custom_asset_type,
 				"severity_type": doc.custom_severity_type,
-				"failure_date": doc.failure_date,
-				"completion_date": doc.completion_date,
+				"failure_date": str(doc.failure_date) if doc.failure_date else None,
+				"completion_date": str(doc.completion_date) if doc.completion_date else None,
 				"repair_status": doc.repair_status,
 				"workflow_state": doc.workflow_state,
 				"stock_consumption": doc.stock_consumption,
