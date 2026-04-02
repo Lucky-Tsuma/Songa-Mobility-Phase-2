@@ -789,6 +789,7 @@ def check_asset_repair_status():
 					"item_code": item.item_code,
 					"warehouse": item.warehouse,
 					"valuation_rate": item.valuation_rate,
+					"uom": item.custom_uom,
 					"consumed_quantity": item.consumed_quantity,
 					"total_value": item.total_value,
 				}
