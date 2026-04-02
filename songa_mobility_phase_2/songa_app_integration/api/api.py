@@ -846,3 +846,115 @@ def comment_on_asset_repair():
 		return {"status": "error", "message": str(e)}
 	finally:
 		frappe.set_user("Administrator")
+
+@frappe.whitelist(allow_guest=False)
+def update_asset_repair():
+    try:
+        data = check_for_empty_payload()
+
+        if isinstance(data, dict) and data.get("status") == "error":
+            return data
+
+        check_for_empty_values(data, ["asset_repair_id", "updated_values", "user_email"])
+
+        asset_repair_id = data.get("asset_repair_id")
+        updated_values = data.get("updated_values")
+        user_email = data.get("user_email")
+
+        if not isinstance(updated_values, dict) or not updated_values:
+            frappe.local.response["http_status_code"] = 400
+            return {"status": "error", "message": "updated_values must be a non-empty object"}
+
+        if not frappe.db.exists("User", user_email):
+            frappe.local.response["http_status_code"] = 404
+            return {"status": "error", "message": "User not found"}
+
+        if not frappe.db.exists("Asset Repair", {"custom_asset_repair_id": asset_repair_id}):
+            frappe.local.response["http_status_code"] = 404
+            return {"status": "error", "message": f"Asset Repair not found. ID: {asset_repair_id}"}
+
+        repair_name = frappe.db.get_value(
+            "Asset Repair", {"custom_asset_repair_id": asset_repair_id}, "name"
+        )
+
+        allowed_fields = {
+            "severity_type_id": {
+                "fieldname": "custom_severity_type_id",
+                "validate": lambda v: frappe.db.get_value("Severity Type", v, "name"),
+                "error": "Severity Type not found",
+                "companion": {
+                    "doctype": "Severity Type",
+                    "fetch_field": "severity_type",
+                    "fieldname": "custom_severity_type",
+                },
+            },
+            "asset_type_id": {
+                "fieldname": "custom_asset_type_id",
+                "validate": lambda v: frappe.db.get_value("Asset Type", v, "name"),
+                "error": "Asset Type not found",
+                "companion": {
+                    "doctype": "Asset Type",
+                    "fetch_field": "asset_type",
+                    "fieldname": "custom_asset_type",
+                },
+            },
+            "description": {
+                "fieldname": "description",
+            },
+            "failure_date": {
+                "fieldname": "failure_date",
+                "coerce": lambda v: frappe.utils.getdate(v),
+            },
+        }
+
+        unrecognised = [k for k in updated_values if k not in allowed_fields]
+        if unrecognised:
+            frappe.local.response["http_status_code"] = 400
+            return {
+                "status": "error",
+                "message": f"Unrecognised field(s): {', '.join(unrecognised)}. "
+                           f"Allowed fields: {', '.join(allowed_fields)}",
+            }
+
+        fields_to_update = {}
+
+        frappe.set_user(user_email)
+
+        for key, value in updated_values.items():
+            field_config = allowed_fields[key]
+
+            if "validate" in field_config:
+                if not field_config["validate"](value):
+                    frappe.local.response["http_status_code"] = 404
+                    return {"status": "error", "message": field_config["error"]}
+
+            if "coerce" in field_config:
+                value = field_config["coerce"](value)
+
+            fields_to_update[field_config["fieldname"]] = value
+
+            # If this field has a companion, fetch and include its value too
+            if "companion" in field_config:
+                companion = field_config["companion"]
+                companion_value = frappe.db.get_value(
+                    companion["doctype"], value, companion["fetch_field"]
+                )
+                fields_to_update[companion["fieldname"]] = companion_value
+
+        frappe.db.set_value("Asset Repair", repair_name, fields_to_update)
+        frappe.db.commit()
+
+        return {
+            "status": "success",
+            "message": "Asset Repair updated successfully.",
+            "asset_repair_id": asset_repair_id,
+            "updated_fields": list(updated_values.keys()),
+        }
+
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.local.response["http_status_code"] = 500
+        return {"status": "error", "message": str(e)}
+
+    finally:
+        frappe.set_user("Administrator")
