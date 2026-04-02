@@ -677,13 +677,14 @@ def create_asset_repair():
         if isinstance(data, dict) and data.get("status") == "error":
             return data
 
-        check_for_empty_values(data, ["asset_repair_id", "failure_date", "description", "asset_id", "asset_type_id", "user_email"])
+        check_for_empty_values(data, ["asset_repair_id", "failure_date", "description", "asset_id", "asset_type_id", "user_email", "severity_type_id"])
 
         asset_repair_id = data.get("asset_repair_id")
         user_email = data.get("user_email")
         description = data.get("description")
         asset_id = data.get("asset_id")
         asset_type_id = data.get("asset_type_id")
+        severity_type_id = data.get("severity_type_id")
         failure_date = data.get("failure_date")
         company = data.get("company")
 
@@ -702,6 +703,16 @@ def create_asset_repair():
         savepoint = "create_asset_repair"
         frappe.db.savepoint(savepoint)
 
+        asset_type = frappe.db.get_value("Asset Type", asset_type_id, "name")
+        if not asset_type:
+            frappe.local.response["http_status_code"] = 404
+            return {"status": "error", "message": "Asset Type not found"}
+
+        severity_type = frappe.db.get_value("Severity Type", severity_type_id, "name")
+        if not severity_type:
+            frappe.local.response["http_status_code"] = 404
+            return {"status": "error", "message": "Severity Type not found"}
+
         try:
             # setting the user_email here, so its easy to identify who created the asset repair and will need updates
             frappe.set_user(user_email)
@@ -709,6 +720,7 @@ def create_asset_repair():
             asset_repair = frappe.new_doc("Asset Repair")
             asset_repair.company = company or frappe.defaults.get_user_default("company")
             asset_repair.custom_asset_repair_id = asset_repair_id
+            asset_repair.custom_severity_type_id = severity_type_id
             asset_repair.asset = asset_id
             asset_repair.custom_asset_type_id = asset_type_id
             asset_repair.description = description
@@ -760,6 +772,7 @@ def check_asset_repair_status():
 			"asset": asset_repair.asset,
 			"asset_name": asset_repair.asset_name,
 			"asset_type": asset_repair.custom_asset_type,
+			"severity_type": asset_repair.custom_severity_type,
 			"failure_date": asset_repair.failure_date,
 			"completion_date": asset_repair.completion_date,
 			"repair_status": asset_repair.repair_status,

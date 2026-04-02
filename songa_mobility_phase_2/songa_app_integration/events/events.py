@@ -110,6 +110,7 @@ def on_asset_repair_update(doc, method):
 				"asset": doc.asset,
 				"asset_name": doc.asset_name,
 				"asset_type": doc.custom_asset_type,
+				"severity_type": doc.custom_severity_type,
 				"failure_date": doc.failure_date,
 				"completion_date": doc.completion_date,
 				"repair_status": doc.repair_status,
