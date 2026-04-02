@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"dkGtA8JuFG\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Songa App Integration</span>\",\"col\":12}},{\"id\":\"8yaY1YwSaC\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Driver\",\"col\":3}},{\"id\":\"OSN03pvxKl\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Energy KWh\",\"col\":3}},{\"id\":\"m6FzEhEOFW\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Rental Days\",\"col\":3}},{\"id\":\"3DJesjRtJr\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"STK Push\",\"col\":3}},{\"id\":\"iFifzeazHN\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Driver Commission Ledger\",\"col\":3}},{\"id\":\"A223hHYPCO\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Asset Type\",\"col\":3}},{\"id\":\"dUwGq17kXU\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Asset Repair\",\"col\":3}},{\"id\":\"jbHvtnYk9r\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Songa Customization Settings\",\"col\":3}}]",
+ "content": "[{\"id\":\"dkGtA8JuFG\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Songa App Integration</span>\",\"col\":12}},{\"id\":\"8yaY1YwSaC\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Driver\",\"col\":3}},{\"id\":\"OSN03pvxKl\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Energy KWh\",\"col\":3}},{\"id\":\"m6FzEhEOFW\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Rental Days\",\"col\":3}},{\"id\":\"3DJesjRtJr\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"STK Push\",\"col\":3}},{\"id\":\"iFifzeazHN\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Driver Commission Ledger\",\"col\":3}},{\"id\":\"dUwGq17kXU\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Asset Repair\",\"col\":3}},{\"id\":\"jbHvtnYk9r\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Songa Customization Settings\",\"col\":3}}]",
  "creation": "2026-03-17 16:12:17.274190",
  "custom_blocks": [],
  "docstatus": 0,
@@ -13,7 +13,7 @@
  "is_hidden": 0,
  "label": "Songa App Integration",
  "links": [],
- "modified": "2026-03-31 13:15:08.609936",
+ "modified": "2026-04-02 10:41:12.694584",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Songa App Integration",
@@ -25,14 +25,6 @@
  "roles": [],
  "sequence_id": 50.0,
  "shortcuts": [
-  {
-   "color": "Green",
-   "doc_view": "List",
-   "label": "Asset Type",
-   "link_to": "Asset Type",
-   "stats_filter": "[]",
-   "type": "DocType"
-  },
   {
    "color": "Green",
    "doc_view": "List",
