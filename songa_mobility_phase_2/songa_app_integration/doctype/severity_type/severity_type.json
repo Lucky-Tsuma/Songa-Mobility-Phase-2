@@ -30,7 +30,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-02 10:46:03.167320",
+ "modified": "2026-04-02 16:56:27.013362",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Severity Type",
@@ -52,7 +52,9 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "search_fields": "severity_type",
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "severity_type"
 }

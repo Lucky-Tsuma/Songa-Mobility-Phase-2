@@ -20,6 +20,7 @@
    "in_standard_filter": 1,
    "label": "Asset type",
    "no_copy": 1,
+   "reqd": 1,
    "unique": 1
   },
   {
@@ -30,7 +31,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-02 10:45:31.575771",
+ "modified": "2026-04-02 16:57:05.842052",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Asset Type",
@@ -55,5 +56,6 @@
  "search_fields": "asset_type",
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "asset_type"
 }
