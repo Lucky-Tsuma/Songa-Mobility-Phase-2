@@ -218,15 +218,6 @@
  {
   "docstatus": 0,
   "doctype": "Workflow State",
-  "icon": "ok-sign",
-  "modified": "2024-03-06 20:09:15.692202",
-  "name": "Approved",
-  "style": "Success",
-  "workflow_state_name": "Approved"
- },
- {
-  "docstatus": 0,
-  "doctype": "Workflow State",
   "icon": "",
   "modified": "2024-03-10 08:19:45.706953",
   "name": "Approved By Material Manager",
@@ -286,5 +277,14 @@
   "name": "Accountant Approval",
   "style": "Success",
   "workflow_state_name": "Accountant Approval"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "ok-sign",
+  "modified": "2024-03-06 20:09:15.692202",
+  "name": "Approved",
+  "style": "Success",
+  "workflow_state_name": "Approved"
  }
 ]

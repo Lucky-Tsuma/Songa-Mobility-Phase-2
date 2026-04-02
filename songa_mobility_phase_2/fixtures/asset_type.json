@@ -7,13 +7,6 @@
   "name": "1"
  },
  {
-  "asset_type": "BATTERY",
-  "docstatus": 0,
-  "doctype": "Asset Type",
-  "modified": "2026-03-31 10:14:18.556978",
-  "name": "2"
- },
- {
   "asset_type": "TILLER",
   "docstatus": 0,
   "doctype": "Asset Type",
@@ -47,5 +40,12 @@
   "doctype": "Asset Type",
   "modified": "2026-03-31 10:16:15.210455",
   "name": "7"
+ },
+ {
+  "asset_type": "BATTERY",
+  "docstatus": 0,
+  "doctype": "Asset Type",
+  "modified": "2026-03-31 10:14:18.556978",
+  "name": "2"
  }
 ]
