@@ -724,7 +724,7 @@ def create_asset_repair():
             asset_repair.asset = asset_id
             asset_repair.custom_asset_type_id = asset_type_id
             asset_repair.description = description
-            asset_repair.failure_date = frappe.utils.getdate(failure_date)
+            asset_repair.failure_date = frappe.utils.get_datetime(failure_date)
             asset_repair.insert(ignore_permissions=True)
 
             apply_workflow(asset_repair, "Send for Approval HM")
