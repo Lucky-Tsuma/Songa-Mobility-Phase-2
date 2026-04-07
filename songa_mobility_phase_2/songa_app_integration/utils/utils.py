@@ -34,6 +34,40 @@ def get_supplier_party_account(supplier, company):
 		frappe.log_error(frappe.get_traceback(), "Get Accounts Error")
 		frappe.throw(str(e))
 
+def _get_driver_id(driver_id):
+	# direct function calls - driver_id as argument
+	if driver_id:
+		return driver_id
+
+	# internall calls - frappe.call
+	if frappe.form_dict.get("driver_id"):
+		return frappe.form_dict.get("driver_id")
+
+	# api calls - JSON body
+	if frappe.request and frappe.request.data:
+		try:
+			return json.loads(frappe.request.data).get("driver_id")
+		except (json.JSONDecodeError, AttributeError):
+			pass
+
+	return None
+
+def _get_company(company):
+	# direct function calls - company as argument
+	if company:
+		return company
+	# internall calls - frappe.call
+	if frappe.form_dict.get("company"):
+		return frappe.form_dict.get("company")
+	# api calls - JSON body
+	if frappe.request and frappe.request.data:
+		try:
+			company = json.loads(frappe.request.data).get("company")
+			if company:
+				return company
+		except (json.JSONDecodeError, AttributeError):
+			pass
+	return frappe.defaults.get_user_default("company")
 
 @frappe.whitelist(allow_guest=False)
 def allocate_commission(driver_commission_ledger_name):
@@ -211,16 +245,13 @@ def deduct_commission(driver_commission_ledger_name, rental_days_record_name=Non
 def get_commission_balance_by_driver(driver_id=None, company=None):
 	"""Returns the commission payable for a driver"""
 	try:
-		if not driver_id and frappe.request.data:
-			driver_id = json.loads(frappe.request.data).get("driver_id")
 
-		if not company and frappe.request.data:
-			company = json.loads(frappe.request.data).get("company") or frappe.defaults.get_user_default(
-				"company"
-			)
+		driver_id = _get_driver_id(driver_id)
 
 		if not driver_id:
 			frappe.throw("driver_id is required")
+
+		company = _get_company(company)
 
 		if not company:
 			frappe.throw("company is required")
@@ -250,8 +281,8 @@ def get_commission_balance_by_driver(driver_id=None, company=None):
 @frappe.whitelist(allow_guest=False)
 def get_rental_days_balance_by_driver(driver_id=None):
 	try:
-		if not driver_id and frappe.request.data:
-			driver_id = json.loads(frappe.request.data).get("driver_id")
+
+		driver_id = _get_driver_id(driver_id)
 
 		if not driver_id:
 			frappe.throw("driver_id is required")
@@ -291,8 +322,8 @@ def get_rental_days_balance_by_driver(driver_id=None):
 @frappe.whitelist(allow_guest=False)
 def get_energy_kwh_balance_by_driver(driver_id=None):
 	try:
-		if not driver_id and frappe.request.data:
-			driver_id = json.loads(frappe.request.data).get("driver_id")
+		
+		driver_id = _get_driver_id(driver_id)
 
 		if not driver_id:
 			frappe.throw("driver_id is required")
@@ -332,8 +363,7 @@ def get_energy_kwh_balance_by_driver(driver_id=None):
 @frappe.whitelist(allow_guest=False)
 def get_overall_balance(driver_id=None):
 	try:
-		if not driver_id and frappe.request.data:
-			driver_id = json.loads(frappe.request.data).get("driver_id")
+		driver_id = _get_driver_id(driver_id)
 
 		if not driver_id:
 			frappe.throw("driver_id is required")
