@@ -155,3 +155,65 @@ def on_asset_repair_update(doc, method):
 				"Asset Repair Completion",
 			)
 			raise
+
+def on_driver_insert(doc, method):
+    if not doc.custom_supplier_group:
+        frappe.log_error(
+            f"Driver {doc.name} is missing Supplier Group. Cannot create linked Supplier/Customer.",
+            "Driver Insert",
+        )
+        frappe.msgprint(
+            f"Driver {doc.name} is missing Supplier Group. Cannot create linked Supplier/Customer.",
+            alert=True,
+        )
+        return
+
+    try:
+        if not (doc.transporter and doc.customer):
+            supplier = frappe.get_doc({
+                "doctype": "Supplier",
+                "supplier_name": doc.full_name,
+                "supplier_type": "Individual",
+                "supplier_group": doc.custom_supplier_group,
+            })
+            supplier.save(ignore_permissions=True)
+
+            customer = frappe.get_doc({
+                "doctype": "Customer",
+                "customer_name": doc.full_name,
+                "customer_type": "Individual",
+            })
+            customer.save(ignore_permissions=True)
+
+            doc.transporter = supplier.name
+            doc.customer = customer.name
+            doc.save(ignore_permissions=True)
+
+        party_link_exists = (
+            frappe.db.exists("Party Link", {
+                "primary_role": "Supplier",
+                "primary_party": doc.transporter,
+                "secondary_role": "Customer",
+                "secondary_party": doc.customer,
+            })
+            or
+            frappe.db.exists("Party Link", {
+                "primary_role": "Customer",
+                "primary_party": doc.customer,
+                "secondary_role": "Supplier",
+                "secondary_party": doc.transporter,
+            })
+        )
+        if not party_link_exists:
+            frappe.get_doc({
+                "doctype": "Party Link",
+                "primary_role": "Supplier",
+                "primary_party": doc.transporter,
+                "secondary_role": "Customer",
+                "secondary_party": doc.customer,
+            }).save(ignore_permissions=True)
+
+    except Exception:
+        frappe.db.rollback()
+        frappe.log_error(frappe.get_traceback(), "Driver Insert Failed")
+        frappe.throw("Failed to create linked Supplier/Customer. Please try again.")

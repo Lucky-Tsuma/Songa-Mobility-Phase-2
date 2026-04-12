@@ -131,7 +131,7 @@ app_include_js = ["/assets/songa_mobility_phase_2/js/driver.js"]
 
 # override_doctype_class = {
 # 	"ToDo": "custom_app.overrides.CustomToDo"
-# }
+# }	
 
 # Document Events
 # ---------------
@@ -147,6 +147,9 @@ doc_events = {
 	"Asset Repair": {
 		"on_update": "songa_mobility_phase_2.songa_app_integration.events.events.on_asset_repair_update",
 	},
+	"Driver": {
+		"after_insert": "songa_mobility_phase_2.songa_app_integration.events.events.on_driver_insert",
+	}
 }
 
 # Scheduled Tasks
