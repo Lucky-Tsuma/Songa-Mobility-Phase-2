@@ -29,10 +29,27 @@ const getBalance = (frm) => {
     });
 };
 
+const filterSongaDrivers = (frm) => {
+    frm.set_query("custom_supplier_group", function() {
+        return {
+            filters: {
+                "parent_supplier_group": "Songa Drivers",
+                "is_group": 0
+            }
+        };
+    });
+}
+
 frappe.ui.form.on("Driver", {
+    onload: function(frm) {
+        filterSongaDrivers(frm);
+    },
     refresh(frm) {
-        frm.add_custom_button("View Overall Balance", () => {
-            return getBalance(frm);
-        });
+        if (!frm.doc.__islocal) {
+            frm.add_custom_button("View Overall Balance", () => {
+                return getBalance(frm);
+            });
+        }
+        filterSongaDrivers(frm);
     }
 });
