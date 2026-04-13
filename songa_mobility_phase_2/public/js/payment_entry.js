@@ -1,12 +1,12 @@
 frappe.ui.form.on("Payment Entry", {
     party: function (frm) {
         if (frm.doc.party_type === "Supplier") {
-            set_branch_and_cost_center(frm);
+            set_payment_entry_branch_and_cost_center(frm);
         }
     }
 });
 
-const set_branch_and_cost_center = (frm) => {
+const set_payment_entry_branch_and_cost_center = (frm) => {
     if (!frm.doc.party) return;
 
     return frappe.call({
