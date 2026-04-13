@@ -26,7 +26,11 @@ app_license = "mit"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/songa_mobility_phase_2/css/songa_mobility_phase_2.css"
-app_include_js = ["/assets/songa_mobility_phase_2/js/driver.js"]
+app_include_js = [
+	"/assets/songa_mobility_phase_2/js/driver.js",
+	"/assets/songa_mobility_phase_2/js/payment_entry.js",
+	"/assets/songa_mobility_phase_2/js/sales_invoice.js"
+]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/songa_mobility_phase_2/css/songa_mobility_phase_2.css"
