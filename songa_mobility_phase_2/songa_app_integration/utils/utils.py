@@ -482,3 +482,45 @@ def process_mpesa_express_request(doc):
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Mpesa Express Request Workflow Error")
 		frappe.throw(str(e))
+@frappe.whitelist(allow_guest=False)
+def get_linked_supplier(customer):
+    """Returns the supplier linked to a customer via Party Link doctype"""
+    try:
+        if not customer:
+            frappe.throw("Customer is required to get linked supplier")
+
+        # Check for linked supplier where Customer is either secondary or primary party
+        linked_supplier = frappe.db.get_value(
+            "Party Link",
+            {"secondary_role": "Customer", "secondary_party": customer},
+            "primary_party"
+        ) or frappe.db.get_value(
+            "Party Link",
+            {"primary_role": "Customer", "primary_party": customer},
+            "secondary_party"
+        )
+
+        return linked_supplier
+
+    except frappe.ValidationError:
+        raise
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Linked Supplier Error")
+        frappe.throw(str(e))
+
+@frappe.whitelist(allow_guest=False)
+def get_branch_and_cost_center_by_supplier(supplier):
+	try:
+		if not supplier:
+			frappe.throw("Supplier is required to get branch and cost center")
+
+		branch = frappe.db.get_value("Supplier", supplier, "custom_branch")
+		cost_center = frappe.db.get_value("Supplier", supplier, "custom_cost_center")
+
+		return {"branch": branch, "cost_center": cost_center}
+
+	except frappe.ValidationError:
+		raise
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Branch and Cost Center Error")
+		frappe.throw(str(e))
