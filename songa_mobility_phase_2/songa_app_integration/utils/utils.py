@@ -92,6 +92,15 @@ def allocate_commission(driver_commission_ledger_name):
 			get_supplier_party_account(supplier=supplier, company=company),
 		)
 
+		branch_and_cost_center_dict = get_branch_and_cost_center_by_supplier(supplier=supplier)
+		branch = branch_and_cost_center_dict.get("branch", "")
+		cost_center = branch_and_cost_center_dict.get("cost_center", "")
+
+		branch_cost_center_fields = {
+			**({"branch": branch} if branch else {}),
+			**({"cost_center": cost_center} if cost_center else {}),
+		}
+
 		journal_entry = frappe.get_doc(
 			{
 				"doctype": "Journal Entry",
@@ -106,11 +115,13 @@ def allocate_commission(driver_commission_ledger_name):
 						"party": supplier,
 						"debit_in_account_currency": 0,
 						"credit_in_account_currency": amount,
+						**branch_cost_center_fields,
 						"is_advance": "No",
 					},
 					{
 						"account": expense_account,
 						"debit_in_account_currency": amount,
+						**branch_cost_center_fields,
 						"credit_in_account_currency": 0,
 						"is_advance": "No",
 					},
@@ -182,6 +193,15 @@ def deduct_commission(driver_commission_ledger_name, rental_days_record_name=Non
 			get_supplier_party_account(supplier=supplier, company=company),
 		)
 
+		branch_and_cost_center_dict = get_branch_and_cost_center_by_supplier(supplier=supplier)
+		branch = branch_and_cost_center_dict.get("branch", "")
+		cost_center = branch_and_cost_center_dict.get("cost_center", "")
+
+		branch_cost_center_fields = {
+			**({"branch": branch} if branch else {}),
+			**({"cost_center": cost_center} if cost_center else {}),
+		}
+
 		journal_entry = frappe.get_doc(
 			{
 				"doctype": "Journal Entry",
@@ -195,6 +215,7 @@ def deduct_commission(driver_commission_ledger_name, rental_days_record_name=Non
 						"party_type": "Supplier",
 						"party": supplier,
 						"debit_in_account_currency": amount,
+						**branch_cost_center_fields,
 						"credit_in_account_currency": 0,
 						"is_advance": "No",
 					},
@@ -202,6 +223,7 @@ def deduct_commission(driver_commission_ledger_name, rental_days_record_name=Non
 						"account": expense_account,
 						"debit_in_account_currency": 0,
 						"credit_in_account_currency": amount,
+						**branch_cost_center_fields,
 						"is_advance": "No",
 					},
 				],
