@@ -4,6 +4,7 @@ import re
 import frappe
 import requests
 
+from songa_mobility_phase_2.songa_app_integration.utils.utils import get_commission_balance_by_driver
 
 def clean_comment(html):
 	# Replace block-level tags with newlines before stripping
@@ -217,3 +218,131 @@ def on_driver_insert(doc, method):
         frappe.db.rollback()
         frappe.log_error(frappe.get_traceback(), "Driver Insert Failed")
         frappe.throw("Failed to create linked Supplier/Customer. Please try again.")
+
+def on_payment_entry_submit(doc, method):
+	# TODO: Revisit this, optimize and refactor as needed. Send data to songa on submit, commented out currently.
+	if doc.payment_type == "Pay" and doc.party_type == "Supplier":
+		supplier_group = frappe.db.get_value("Supplier", doc.party, "supplier_group")
+		if supplier_group:
+			parent_supplier_group = frappe.db.get_value("Supplier Group", supplier_group, "parent_supplier_group")
+			if parent_supplier_group == "Songa Drivers":
+				driver_id = frappe.db.get_value("Driver", {"transporter": doc.party}, "name")
+				if driver_id:
+					commission_balance = get_commission_balance_by_driver(driver_id)
+					if commission_balance["status"] == "error":
+						frappe.throw(f"Error fetching commission balance: {commission_balance['message']}")
+					else:
+						try:
+							url = frappe.get_single("Songa Customization Settings").songa_webhook_endpoint
+
+							if not url:
+								frappe.log_error(
+									"Songa webhook endpoint not found, please check Songa Customization Settings",
+									"Payment Entry Submission",
+								)
+								return
+							
+							frappe.utils.logger.set_log_level("INFO")
+							songa_webhook_logger = frappe.logger("songa_webhook_log", allow_site=True, file_count=20)
+
+							payload = {
+								"action_type": "Commission Deduction",
+								"driver_id": driver_id,
+								"payment_entry": doc.name,
+								"amount": doc.paid_amount,
+								"commission_balance": commission_balance.get("balance"),
+							}
+							data = json.dumps(payload)
+							headers = {"Content-Type": "application/json"}
+							# response = requests.post(url, data=data, headers=headers, verify=True)
+
+							# if response.status_code != 200:
+							# 	frappe.log_error(
+							# 		f"Failed to send commission deduction to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
+							# 		"Payment Entry Submission",
+							# 	)
+							# 	return
+
+							songa_webhook_logger.info(
+								f"Payment Entry Submitted - {doc.name} for Driver {driver_id}. Sent commission deduction event to Songa."
+							)
+						except Exception as e:
+							frappe.log_error(
+								f"Error fetching Songa webhook endpoint: {e!s}",
+								"Payment Entry Submission",
+							)
+							return
+			else:
+				return
+		else:
+			return
+
+def on_journal_entry_submit(doc, method):
+    if not doc.is_system_generated or doc.voucher_type != "Journal Entry":
+        return
+
+    customer_credits = [
+        entry for entry in doc.accounts
+        if entry.party_type == "Customer" and entry.credit > 0
+    ]
+
+    supplier_debits = [
+        entry for entry in doc.accounts
+        if entry.party_type == "Supplier" and entry.debit > 0
+    ]
+
+    unique_customers = set(entry.party for entry in customer_credits)
+    unique_suppliers = set(entry.party for entry in supplier_debits)
+
+    if len(unique_customers) != 1 or len(unique_suppliers) != 1:
+        return
+
+    supplier = frappe.get_doc("Supplier", supplier_debits[0].party)
+
+    driver_id = frappe.db.get_value("Driver", {"transporter": supplier.name}, "name")
+    if not driver_id:
+        return
+
+    commission_balance = get_commission_balance_by_driver(driver_id)
+    if commission_balance["status"] == "error":
+        frappe.throw(f"Error fetching commission balance: {commission_balance['message']}")
+    else:
+        try:
+            url = frappe.get_single("Songa Customization Settings").songa_webhook_endpoint
+            if not url:
+                frappe.log_error(
+                    "Songa webhook endpoint not found, please check Songa Customization Settings",
+                    "Journal Entry Submission",
+                )
+                return
+
+            frappe.utils.logger.set_log_level("INFO")
+            songa_webhook_logger = frappe.logger("songa_webhook_log", allow_site=True, file_count=20)
+
+            payload = {
+                "action_type": "Commission Deduction",
+                "driver_id": driver_id,
+                "journal_entry": doc.name,
+                "amount": customer_credits[0].credit,
+                "commission_balance": commission_balance.get("balance"),
+            }
+            data = json.dumps(payload)
+            headers = {"Content-Type": "application/json"}
+
+            # response = requests.post(url, data=data, headers=headers, verify=True)
+            # if response.status_code != 200:
+            #     frappe.log_error(
+            #         f"Failed to send commission deduction reversal to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
+            #         "Journal Entry Submission",
+            #     )
+            #     return
+
+            songa_webhook_logger.info(
+                f"Journal Entry Submitted - {doc.name} for Driver {driver_id}. Sent commission deduction event to Songa."
+            )
+        except Exception as e:
+            frappe.log_error(
+                f"Error fetching Songa webhook endpoint: {e!s}",
+                "Journal Entry Submission",
+            )
+            return

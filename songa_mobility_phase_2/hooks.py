@@ -154,7 +154,13 @@ doc_events = {
 	},
 	"Driver": {
 		"after_insert": "songa_mobility_phase_2.songa_app_integration.events.events.on_driver_insert",
-	}
+	},
+    "Payment Entry": {
+		"on_submit": "songa_mobility_phase_2.songa_app_integration.events.events.on_payment_entry_submit",
+	},
+	"Journal Entry": {
+		"on_submit": "songa_mobility_phase_2.songa_app_integration.events.events.on_journal_entry_submit",
+	},
 }
 
 # Scheduled Tasks
