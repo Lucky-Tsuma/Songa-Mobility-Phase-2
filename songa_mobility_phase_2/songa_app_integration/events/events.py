@@ -237,8 +237,8 @@ def on_payment_entry_submit(doc, method):
 
 							if not url:
 								frappe.log_error(
-									"Songa webhook endpoint not found, please check Songa Customization Settings",
-									"Payment Entry Submission",
+									title="Payment Entry Submission",
+									message=f"Songa webhook endpoint not found, please check Songa Customization Settings",
 								)
 								return
 							
@@ -252,14 +252,15 @@ def on_payment_entry_submit(doc, method):
 								"amount": doc.paid_amount,
 								"commission_balance": commission_balance.get("balance"),
 							}
+							print(f"\n\n{payload}\n\n")
 							data = json.dumps(payload)
 							headers = {"Content-Type": "application/json"}
 							response = requests.post(url, data=data, headers=headers, verify=True)
 
 							if response.status_code != 200:
 								frappe.log_error(
-									f"Failed to send commission deduction to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
-									"Payment Entry Submission",
+									title="Payment Entry Submission",
+									message=f"Failed to send commission deduction to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
 								)
 								return
 
@@ -268,8 +269,8 @@ def on_payment_entry_submit(doc, method):
 							)
 						except Exception as e:
 							frappe.log_error(
-								f"Error fetching Songa webhook endpoint: {e!s}",
-								"Payment Entry Submission",
+								title="Payment Entry Submission",
+								message=f"Error fetching Songa webhook endpoint: {e!s}",
 							)
 							return
 			else:
@@ -311,9 +312,9 @@ def on_journal_entry_submit(doc, method):
             url = frappe.get_single("Songa Customization Settings").songa_webhook_endpoint
             if not url:
                 frappe.log_error(
-                    "Songa webhook endpoint not found, please check Songa Customization Settings",
-                    "Journal Entry Submission",
-                )
+					title="Journal Entry Submission",
+					message=f"Songa webhook endpoint not found, please check Songa Customization Settings",
+				)
                 return
 
             frappe.utils.logger.set_log_level("INFO")
@@ -323,7 +324,7 @@ def on_journal_entry_submit(doc, method):
                 "action_type": "Commission Deduction",
                 "driver_id": driver_id,
                 "journal_entry": doc.name,
-                "amount": customer_credits[0].credit,
+                "amount": doc.total_debit,
                 "commission_balance": commission_balance.get("balance"),
             }
             data = json.dumps(payload)
@@ -332,8 +333,8 @@ def on_journal_entry_submit(doc, method):
             response = requests.post(url, data=data, headers=headers, verify=True)
             if response.status_code != 200:
                 frappe.log_error(
-                    f"Failed to send commission deduction reversal to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
-                    "Journal Entry Submission",
+					title="Journal Entry Submission",
+					message=f"Failed to send commission deduction to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
                 )
                 return
 
@@ -342,7 +343,7 @@ def on_journal_entry_submit(doc, method):
             )
         except Exception as e:
             frappe.log_error(
-                f"Error fetching Songa webhook endpoint: {e!s}",
-                "Journal Entry Submission",
-            )
+				title="Journal Entry Submission",
+				message=f"Error fetching Songa webhook endpoint: {e!s}",
+			)
             return
