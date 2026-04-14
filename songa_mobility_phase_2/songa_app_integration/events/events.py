@@ -254,14 +254,14 @@ def on_payment_entry_submit(doc, method):
 							}
 							data = json.dumps(payload)
 							headers = {"Content-Type": "application/json"}
-							# response = requests.post(url, data=data, headers=headers, verify=True)
+							response = requests.post(url, data=data, headers=headers, verify=True)
 
-							# if response.status_code != 200:
-							# 	frappe.log_error(
-							# 		f"Failed to send commission deduction to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
-							# 		"Payment Entry Submission",
-							# 	)
-							# 	return
+							if response.status_code != 200:
+								frappe.log_error(
+									f"Failed to send commission deduction to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
+									"Payment Entry Submission",
+								)
+								return
 
 							songa_webhook_logger.info(
 								f"Payment Entry Submitted - {doc.name} for Driver {driver_id}. Sent commission deduction event to Songa."
@@ -329,13 +329,13 @@ def on_journal_entry_submit(doc, method):
             data = json.dumps(payload)
             headers = {"Content-Type": "application/json"}
 
-            # response = requests.post(url, data=data, headers=headers, verify=True)
-            # if response.status_code != 200:
-            #     frappe.log_error(
-            #         f"Failed to send commission deduction reversal to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
-            #         "Journal Entry Submission",
-            #     )
-            #     return
+            response = requests.post(url, data=data, headers=headers, verify=True)
+            if response.status_code != 200:
+                frappe.log_error(
+                    f"Failed to send commission deduction reversal to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
+                    "Journal Entry Submission",
+                )
+                return
 
             songa_webhook_logger.info(
                 f"Journal Entry Submitted - {doc.name} for Driver {driver_id}. Sent commission deduction event to Songa."
