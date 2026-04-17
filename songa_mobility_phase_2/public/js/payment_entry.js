@@ -4,7 +4,7 @@ const _paymentEntrycommissionDefaults = {
     cost_center: null,
 };
 
-const clear_branch_and_cost_center_pi = (frm) => {
+const clear_branch_and_cost_center_pe = (frm) => {
     _paymentEntrycommissionDefaults.branch = null;
     _paymentEntrycommissionDefaults.cost_center = null;
     frm.set_value("branch", "");
@@ -40,7 +40,7 @@ frappe.ui.form.on("Payment Entry", {
 });
 
 const set_payment_entry_branch_and_cost_center = (frm) => {
-    if (!frm.doc.party) return clear_branch_and_cost_center_pi(frm);
+    if (!frm.doc.party) return clear_branch_and_cost_center_pe(frm);
 
     return frappe.call({
         method: "songa_mobility_phase_2.songa_app_integration.utils.utils.get_branch_and_cost_center_by_supplier",
@@ -55,7 +55,7 @@ const set_payment_entry_branch_and_cost_center = (frm) => {
                 frm.set_value("branch", supplier_doc.branch || "");
                 frm.set_value("cost_center", supplier_doc.cost_center || "");
             } else {
-                return clear_branch_and_cost_center_pi(frm);
+                return clear_branch_and_cost_center_pe(frm);
             }
         },
         error: function () {
