@@ -4,7 +4,7 @@ const _salesInvoicecommissionDefaults = {
     cost_center: null,
 };
 
-const clear_branch_and_cost_center = (frm) => {
+const clear_branch_and_cost_center_si = (frm) => {
     _salesInvoicecommissionDefaults.branch = null;
     _salesInvoicecommissionDefaults.cost_center = null;
     frm.set_value("branch", "");
@@ -41,19 +41,19 @@ frappe.ui.form.on("Sales Invoice", {
 });
 
 const set_sales_invoice_branch_and_cost_center = (frm) => {
-    if (!frm.doc.customer) return clear_branch_and_cost_center(frm);
+    if (!frm.doc.customer) return clear_branch_and_cost_center_si(frm);
 
     return frappe.call({
         method: "songa_mobility_phase_2.songa_app_integration.utils.utils.get_linked_supplier",
         args: { customer: frm.doc.customer },
         callback: function (r) {
-            if (!r.message) return clear_branch_and_cost_center(frm);
+            if (!r.message) return clear_branch_and_cost_center_si(frm);
 
             return frappe.call({
                 method: "songa_mobility_phase_2.songa_app_integration.utils.utils.get_branch_and_cost_center_by_supplier",
                 args: { supplier: r.message },
                 callback: function (res) {
-                    if (!res.message) return clear_branch_and_cost_center(frm);
+                    if (!res.message) return clear_branch_and_cost_center_si(frm);
 
                     _salesInvoicecommissionDefaults.branch = res.message.branch || null;
                     _salesInvoicecommissionDefaults.cost_center = res.message.cost_center || null;
