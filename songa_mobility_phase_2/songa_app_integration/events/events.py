@@ -89,7 +89,7 @@ def on_asset_repair_update(doc, method):
 	if not doc.has_value_changed("workflow_state"):
 		return
 
-	if doc.workflow_state == "Approved" and doc.workflow_state != doc.get_doc_before_save().workflow_state:
+	if doc.workflow_state == "Completed" and doc.workflow_state != doc.get_doc_before_save().workflow_state:
 		try:
 			url = frappe.get_single("Songa Customization Settings").songa_webhook_endpoint
 
@@ -102,8 +102,6 @@ def on_asset_repair_update(doc, method):
 
 			frappe.utils.logger.set_log_level("INFO")
 			songa_webhook_logger = frappe.logger("songa_webhook_log", allow_site=True, file_count=20)
-
-			asset_repair_id = doc.custom_asset_repair_id or doc.name
 
 			payload = {
 				"action_type": "Service Completed" if doc.repair_status == "Completed" else "Service Cancelled",

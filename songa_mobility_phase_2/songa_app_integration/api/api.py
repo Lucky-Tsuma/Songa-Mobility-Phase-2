@@ -727,7 +727,7 @@ def create_asset_repair():
             asset_repair.failure_date = frappe.utils.get_datetime(failure_date)
             asset_repair.insert(ignore_permissions=True)
 
-            apply_workflow(asset_repair, "Send for Approval HM")
+            apply_workflow(asset_repair, "Submit For Approval - Technical Agent")
 
             frappe.db.commit()
 
