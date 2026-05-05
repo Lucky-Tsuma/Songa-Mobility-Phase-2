@@ -162,6 +162,9 @@ doc_events = {
 	"Journal Entry": {
 		"on_submit": "songa_mobility_phase_2.songa_app_integration.events.events.on_journal_entry_submit",
 	},
+    "Purchase Invoice": {
+		"validate": "songa_mobility_phase_2.songa_app_integration.events.events.on_purchase_invoice_validate",
+	},
 }
 
 # Scheduled Tasks

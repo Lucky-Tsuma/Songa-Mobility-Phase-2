@@ -345,3 +345,9 @@ def on_journal_entry_submit(doc, method):
 				message=f"Error fetching Songa webhook endpoint: {e!s}",
 			)
             return
+		
+def on_purchase_invoice_validate(doc, method):
+	if not doc.cost_center or not doc.branch:
+		cost_center, branch = frappe.db.get_value("Supplier", doc.supplier, ["custom_cost_center", "custom_branch"])
+		doc.cost_center = cost_center
+		doc.branch = branch
