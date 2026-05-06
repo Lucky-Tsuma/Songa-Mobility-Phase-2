@@ -7,6 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "company",
+  "posting_date",
   "driver",
   "column_break_cdey",
   "transaction_type",
@@ -106,6 +107,13 @@
    "fieldtype": "Select",
    "label": "Usage",
    "options": "\nRental days recharge\nEnergy recharge"
+  },
+  {
+   "default": "Today",
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "label": "Posting Date",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
@@ -122,11 +130,11 @@
    "link_fieldname": "driver_commission_ledger"
   }
  ],
- "modified": "2026-03-11 11:40:26.300370",
+ "modified": "2026-05-06 10:58:44.991589",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Driver Commission Ledger",
- "naming_rule": "Expression",
+ "naming_rule": "Expression (old style)",
  "owner": "Administrator",
  "permissions": [
   {
