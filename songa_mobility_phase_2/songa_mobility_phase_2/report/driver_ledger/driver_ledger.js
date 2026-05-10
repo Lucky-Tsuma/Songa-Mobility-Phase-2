@@ -25,10 +25,10 @@ frappe.query_reports["Driver Ledger"] = {
 			"reqd": 0
 		},
 		{
-			"fieldname": "transaction_type",
-			"label": __("Transaction Type"),
+			"fieldname": "usage",
+			"label": __("Usage"),
 			"fieldtype": "Select",
-			"options": ["All", "Allocation", "Deduction"],
+			"options": ["All", "Rental days recharge", "Energy recharge"],
 			"reqd": 0
 		},
 		{
