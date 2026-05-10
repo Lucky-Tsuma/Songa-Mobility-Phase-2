@@ -137,8 +137,6 @@ def get_data(filters=None):
                 }
             )
 
-            frappe.msgprint(f"Rental Days entry {entry.name} for driver {entry.driver} has {entry.no_of_days} days")
-
     # ── 3. Energy KWh – Mpesa recharges ─────────────────────────────────────
     #
     #   Same logic as Rental Days but for Energy KWh documents.
@@ -194,8 +192,6 @@ def get_data(filters=None):
                     "mpesa_transaction_id": entry.mpesa_express_request,
                 }
             )
-
-            frappe.msgprint(f"Energy KWh entry {entry.name} for driver {entry.driver} has {entry.energy_qty} kWh")
 
     # Sort the merged result by driver first, then chronologically
     result.sort(key=lambda r: (r.get("driver") or "", str(r.get("posting_date") or "")))
