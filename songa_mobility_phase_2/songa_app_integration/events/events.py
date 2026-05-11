@@ -351,3 +351,9 @@ def on_purchase_invoice_validate(doc, method):
 		cost_center, branch = frappe.db.get_value("Supplier", doc.supplier, ["custom_cost_center", "custom_branch"])
 		doc.cost_center = cost_center
 		doc.branch = branch
+
+	for item in doc.items:
+		# TODO: Should we set the two only if not set? Find out and adjust accordingly
+		item.cost_center = frappe.db.get_value("Item", item.item_code, "custom_purchase_cost_center") or doc.cost_center
+		item.branch = frappe.db.get_value("Item", item.item_code, "custom_branch") or doc.branch
+
