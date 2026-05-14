@@ -352,3 +352,8 @@ def on_purchase_invoice_validate(doc, method):
 		doc.cost_center = cost_center
 		doc.branch = branch
 
+	for item in doc.items:
+			item_branch = frappe.db.get_value("Item Default", {"parent": item.item_code}, "custom_branch")
+			if item_branch and item.branch != item_branch:
+				item.branch = item_branch
+				
