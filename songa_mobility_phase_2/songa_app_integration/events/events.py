@@ -347,13 +347,11 @@ def on_journal_entry_submit(doc, method):
             return
 		
 def on_purchase_invoice_validate(doc, method):
-	if not doc.cost_center or not doc.branch:
-		cost_center, branch = frappe.db.get_value("Supplier", doc.supplier, ["custom_cost_center", "custom_branch"])
-		doc.cost_center = cost_center
-		doc.branch = branch
-
 	for item in doc.items:
 			item_branch = frappe.db.get_value("Item Default", {"parent": item.item_code}, "custom_branch")
 			if item_branch and item.branch != item_branch:
 				item.branch = item_branch
 				
+			item_cost_center = frappe.db.get_value("Item Default", {"parent": item.item_code}, "buying_cost_center")
+			if item_cost_center and item.cost_center != item_cost_center:
+				item.cost_center = item_cost_center
