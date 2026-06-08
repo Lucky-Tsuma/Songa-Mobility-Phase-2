@@ -355,3 +355,25 @@ def on_purchase_invoice_validate(doc, method):
 			item_cost_center = frappe.db.get_value("Item Default", {"parent": item.item_code}, "buying_cost_center")
 			if item_cost_center and item.cost_center != item_cost_center:
 				item.cost_center = item_cost_center
+
+
+def on_stock_entry_validate(doc, method):
+	if doc.stock_entry_type != "Material Issue" or not doc.asset_repair:
+		return
+
+	asset = frappe.db.get_value("Asset Repair", doc.asset_repair, "asset")
+	if not asset:
+		return
+
+	asset_owner = frappe.db.get_value("Asset", asset, "asset_owner")
+
+	settings = frappe.get_single("Songa Customization Settings")
+	expense_account = (
+		settings.lease_to_own if asset_owner == "Customer" else settings.internal_consumption
+	)
+
+	if not expense_account:
+		return
+
+	for item in doc.items:
+		item.expense_account = expense_account

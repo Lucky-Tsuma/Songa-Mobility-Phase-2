@@ -165,6 +165,9 @@ doc_events = {
     "Purchase Invoice": {
 		"validate": "songa_mobility_phase_2.songa_app_integration.events.events.on_purchase_invoice_validate",
 	},
+	"Stock Entry": {
+		"validate": "songa_mobility_phase_2.songa_app_integration.events.events.on_stock_entry_validate",
+	},
 }
 
 # Scheduled Tasks
