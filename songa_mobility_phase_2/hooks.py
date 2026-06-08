@@ -32,6 +32,7 @@ app_include_js = [
 	"/assets/songa_mobility_phase_2/js/sales_invoice.js",
 	"/assets/songa_mobility_phase_2/js/purchase_order.js",
 	"/assets/songa_mobility_phase_2/js/purchase_invoice.js",
+	"/assets/songa_mobility_phase_2/js/stock_entry.js",
 ]
 
 # include js, css files in header of web template
@@ -151,6 +152,7 @@ doc_events = {
 		"on_update": "songa_mobility_phase_2.songa_app_integration.events.events.on_comment_update",
 	},
 	"Asset Repair": {
+		"validate": "songa_mobility_phase_2.songa_app_integration.events.events.on_asset_repair_validate",
 		"on_update": "songa_mobility_phase_2.songa_app_integration.events.events.on_asset_repair_update",
 	},
 	"Driver": {

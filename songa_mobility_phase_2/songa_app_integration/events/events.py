@@ -357,6 +357,24 @@ def on_purchase_invoice_validate(doc, method):
 				item.cost_center = item_cost_center
 
 
+def on_asset_repair_validate(doc, method):
+	if not doc.asset:
+		return
+
+	asset_details = frappe.db.get_value(
+		"Asset", doc.asset, ["cost_center", "branch", "custom_branch"], as_dict=True
+	)
+	if not asset_details:
+		return
+
+	if asset_details.cost_center:
+		doc.cost_center = asset_details.cost_center
+
+	branch = asset_details.custom_branch or asset_details.branch
+	if branch:
+		doc.branch = branch
+
+
 def on_stock_entry_validate(doc, method):
 	if doc.stock_entry_type != "Material Issue" or not doc.asset_repair:
 		return
