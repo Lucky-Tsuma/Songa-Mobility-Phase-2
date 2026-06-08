@@ -9,7 +9,12 @@
   "driver_commission_account",
   "stk_push_payment_gateway",
   "column_break_lpcu",
-  "songa_webhook_endpoint"
+  "songa_webhook_endpoint",
+  "asset_repair_tab",
+  "stock_expense_accounts_section",
+  "lease_to_own",
+  "column_break_nboc",
+  "internal_consumption"
  ],
  "fields": [
   {
@@ -40,13 +45,39 @@
    "label": "Driver Commission Account",
    "options": "Account",
    "reqd": 1
+  },
+  {
+   "fieldname": "asset_repair_tab",
+   "fieldtype": "Tab Break",
+   "label": "Asset Repair"
+  },
+  {
+   "fieldname": "stock_expense_accounts_section",
+   "fieldtype": "Section Break",
+   "label": "Stock expense accounts"
+  },
+  {
+   "fieldname": "lease_to_own",
+   "fieldtype": "Link",
+   "label": "Lease to own",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_nboc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "internal_consumption",
+   "fieldtype": "Link",
+   "label": "Internal consumption",
+   "options": "Account"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-25 18:39:43.437692",
+ "modified": "2026-06-08 10:58:13.107854",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Songa Customization Settings",

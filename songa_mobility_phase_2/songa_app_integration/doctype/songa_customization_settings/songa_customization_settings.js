@@ -3,12 +3,14 @@
 
 frappe.ui.form.on("Songa Customization Settings", {
 	onload(frm) {
-		frm.set_query("driver_commission_account", () => {
-			return {
-				filters: {
-					root_type: "Expense",
-				},
-			};
+		const expenseAccountQuery = () => ({
+			filters: {
+				root_type: "Expense",
+			},
 		});
+
+		for (const field of ["driver_commission_account", "lease_to_own", "internal_consumption"]) {
+			frm.set_query(field, expenseAccountQuery);
+		}
 	},
 });
