@@ -246,15 +246,6 @@
   "docstatus": 0,
   "doctype": "Workflow State",
   "icon": "",
-  "modified": "2026-03-28 18:09:33.177737",
-  "name": "Completed",
-  "style": "Success",
-  "workflow_state_name": "Completed"
- },
- {
-  "docstatus": 0,
-  "doctype": "Workflow State",
-  "icon": "",
   "modified": "2026-01-07 10:44:23.272164",
   "name": "Pending Approval HM",
   "style": "Primary",
@@ -304,5 +295,14 @@
   "name": "Pending Approval - Technical Agent",
   "style": "",
   "workflow_state_name": "Pending Approval - Technical Agent"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
+  "modified": "2026-03-28 18:09:33.177737",
+  "name": "Completed",
+  "style": "Success",
+  "workflow_state_name": "Completed"
  }
 ]
