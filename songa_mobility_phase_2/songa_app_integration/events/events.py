@@ -140,7 +140,7 @@ def on_asset_repair_update(doc, method):
 			if response.status_code != 200:
 				frappe.log_error(
 					title="Asset Repair Completion",
-					message=f"Failed to send asset repair completion to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
+					message=f"Failed to send asset repair completion to Songa webhook. Status code: {response.status_code}, Response: {response.text}\n Payload: {payload}",
 				)
 				return
 
