@@ -151,7 +151,7 @@ def on_asset_repair_update(doc, method):
 		except Exception as e:
 			frappe.log_error(
 				title="Asset Repair Completion",
-				message=f"Error processing asset repair completion for {doc.name}: {e!s}",
+				message=f"Error processing asset repair completion for {doc.name}: {e!s}\nPayload: {payload}",
 			)
 			raise
 
@@ -250,7 +250,6 @@ def on_payment_entry_submit(doc, method):
 								"amount": doc.paid_amount,
 								"commission_balance": commission_balance.get("balance"),
 							}
-							print(f"\n\n{payload}\n\n")
 							data = json.dumps(payload)
 							headers = {"Content-Type": "application/json"}
 							response = requests.post(url, data=data, headers=headers, verify=True)
