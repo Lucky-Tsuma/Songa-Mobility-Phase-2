@@ -145,7 +145,7 @@ def on_asset_repair_update(doc, method):
 				return
 
 			songa_webhook_logger.info(
-				f"Asset Repair Completed - {doc.name} for Asset {doc.asset}. Sent completion event to Songa."
+				f"Asset Repair Completed - {doc.name} for Asset {doc.asset}. Sent completion event to Songa. Payload: {payload}"
 			)
 
 		except Exception as e:
