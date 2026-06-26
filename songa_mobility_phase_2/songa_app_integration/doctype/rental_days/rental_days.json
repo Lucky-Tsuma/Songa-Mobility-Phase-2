@@ -26,7 +26,6 @@
  ],
  "fields": [
   {
-   "fetch_from": "wallet_request.driver",
    "fieldname": "driver",
    "fieldtype": "Link",
    "in_list_view": 1,
