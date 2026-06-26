@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"dkGtA8JuFG\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h3\\\">Your Shortcuts</span>\",\"col\":12}},{\"id\":\"8yaY1YwSaC\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Driver\",\"col\":3}},{\"id\":\"wDashScut01\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Driver Wallets Dashboard\",\"col\":3}},{\"id\":\"3DJesjRtJr\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"STK Push\",\"col\":3}},{\"id\":\"jbHvtnYk9r\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Songa Customization Settings\",\"col\":3}},{\"id\":\"svzf30iv9a\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"SoqZUExO-O\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h3\\\">Reports &amp; Masters</span>\",\"col\":12}},{\"id\":\"ZiVD_FmYtu\",\"type\":\"card\",\"data\":{\"card_name\":\"Driver Wallet\",\"col\":4}},{\"id\":\"4AmiQJNmys\",\"type\":\"card\",\"data\":{\"card_name\":\"Asset Repair\",\"col\":4}},{\"id\":\"64sLE6X3kU\",\"type\":\"card\",\"data\":{\"card_name\":\"Settings\",\"col\":4}},{\"id\":\"m2kYfhaVm3\",\"type\":\"card\",\"data\":{\"card_name\":\"Reports\",\"col\":4}}]",
+ "content": "[{\"id\":\"dkGtA8JuFG\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h3\\\">Your Shortcuts</span>\",\"col\":12}},{\"id\":\"8yaY1YwSaC\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Driver\",\"col\":3}},{\"id\":\"wDashScut01\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Driver Wallet Dashboard\",\"col\":3}},{\"id\":\"wDashScut02\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Asset Maintenance Dashboard\",\"col\":3}},{\"id\":\"3DJesjRtJr\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"STK Push\",\"col\":3}},{\"id\":\"jbHvtnYk9r\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Songa Customization Settings\",\"col\":3}},{\"id\":\"svzf30iv9a\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"SoqZUExO-O\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h3\\\">Reports &amp; Masters</span>\",\"col\":12}},{\"id\":\"ZiVD_FmYtu\",\"type\":\"card\",\"data\":{\"card_name\":\"Driver Wallet\",\"col\":4}},{\"id\":\"4AmiQJNmys\",\"type\":\"card\",\"data\":{\"card_name\":\"Asset Repair\",\"col\":4}},{\"id\":\"64sLE6X3kU\",\"type\":\"card\",\"data\":{\"card_name\":\"Settings\",\"col\":4}},{\"id\":\"m2kYfhaVm3\",\"type\":\"card\",\"data\":{\"card_name\":\"Reports\",\"col\":4}}]",
  "creation": "2026-03-17 16:12:17.274190",
  "custom_blocks": [],
  "docstatus": 0,
@@ -134,7 +134,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Reports",
-   "link_count": 4,
+   "link_count": 6,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -178,9 +178,29 @@
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Commission Ledger Status",
+   "link_count": 0,
+   "link_to": "Commission Ledger Status",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Asset Repair Analytics",
+   "link_count": 0,
+   "link_to": "Asset Repair Analytics",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-06-27 00:07:30.000000",
+ "modified": "2026-06-27 00:44:00.000000",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Songa App Integration",
@@ -202,8 +222,14 @@
   },
   {
    "color": "Blue",
-   "label": "Driver Wallets Dashboard",
-   "link_to": "Songa Driver Wallets Dashboard",
+   "label": "Driver Wallet Dashboard",
+   "link_to": "Driver Wallet Dashboard",
+   "type": "Dashboard"
+  },
+  {
+   "color": "Orange",
+   "label": "Asset Maintenance Dashboard",
+   "link_to": "Asset Maintenance Dashboard",
    "type": "Dashboard"
   },
   {

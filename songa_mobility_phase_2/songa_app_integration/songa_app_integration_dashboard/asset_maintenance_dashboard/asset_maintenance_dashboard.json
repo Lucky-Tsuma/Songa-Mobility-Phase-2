@@ -1,0 +1,42 @@
+{
+ "cards": [
+  {
+   "card": "Open Repairs"
+  },
+  {
+   "card": "Completed Repairs (This Month)"
+  },
+  {
+   "card": "Total Repair Cost (This Month)"
+  },
+  {
+   "card": "Repairs with Stock Consumption"
+  }
+ ],
+ "charts": [
+  {
+   "chart": "Repair Cost Trend",
+   "width": "Full"
+  },
+  {
+   "chart": "Repairs by Severity",
+   "width": "Half"
+  },
+  {
+   "chart": "Repairs by Asset Type",
+   "width": "Half"
+  }
+ ],
+ "creation": "2026-06-27 00:30:00.000000",
+ "dashboard_name": "Asset Maintenance Dashboard",
+ "docstatus": 0,
+ "doctype": "Dashboard",
+ "idx": 0,
+ "is_default": 0,
+ "is_standard": 1,
+ "modified": "2026-06-27 00:44:00.000000",
+ "modified_by": "Administrator",
+ "module": "Songa App Integration",
+ "name": "Asset Maintenance Dashboard",
+ "owner": "Administrator"
+}
