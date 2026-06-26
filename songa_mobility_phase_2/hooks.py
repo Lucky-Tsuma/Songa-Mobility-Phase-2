@@ -33,6 +33,7 @@ app_include_js = [
 	"/assets/songa_mobility_phase_2/js/purchase_order.js",
 	"/assets/songa_mobility_phase_2/js/purchase_invoice.js",
 	"/assets/songa_mobility_phase_2/js/stock_entry.js",
+	"/assets/songa_mobility_phase_2/js/journal_entry.js",
 ]
 
 # include js, css files in header of web template

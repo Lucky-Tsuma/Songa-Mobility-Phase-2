@@ -1,6 +1,5 @@
 frappe.ui.form.on("Journal Entry Account", {
     party: function (frm, cdt, cdn) {
-        console.log("Party field changed in Journal Entry Account child table");
         const row = frappe.get_doc(cdt, cdn);
         if (row.party_type === "Supplier" && row.party) {
             set_je_account_branch_and_cost_center(frm, row);
@@ -14,7 +13,6 @@ const set_je_account_branch_and_cost_center = (frm, row) => {
         args: { supplier: row.party },
         callback: function (r) {
             if (r.message) {
-                console.log(r.message);
                 frappe.model.set_value(row.doctype, row.name, "branch", r.message.branch);
                 frappe.model.set_value(row.doctype, row.name, "cost_center", r.message.cost_center);
                 frm.refresh_field("accounts");
