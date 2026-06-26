@@ -15,6 +15,10 @@
  ],
  "charts": [
   {
+   "chart": "Recharge Trend",
+   "width": "Full"
+  },
+  {
    "chart": "STK Push Outcomes",
    "width": "Half"
   },
@@ -30,7 +34,7 @@
  "idx": 0,
  "is_default": 0,
  "is_standard": 1,
- "modified": "2026-06-26 23:50:00.000000",
+ "modified": "2026-06-27 00:07:00.000000",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Songa Driver Wallets Dashboard",

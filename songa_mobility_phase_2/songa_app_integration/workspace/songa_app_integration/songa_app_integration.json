@@ -134,7 +134,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Reports",
-   "link_count": 1,
+   "link_count": 4,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -148,9 +148,39 @@
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Driver Wallet Activity",
+   "link_count": 0,
+   "link_to": "Driver Wallet Activity",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Wallet Recharge Analytics",
+   "link_count": 0,
+   "link_to": "Wallet Recharge Analytics",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Songa STK Push Status",
+   "link_count": 0,
+   "link_to": "Songa STK Push Status",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-06-27 00:02:02.288314",
+ "modified": "2026-06-27 00:07:30.000000",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Songa App Integration",
