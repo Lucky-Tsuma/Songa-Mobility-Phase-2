@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"dkGtA8JuFG\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Songa App Integration</span>\",\"col\":12}},{\"id\":\"8yaY1YwSaC\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Driver\",\"col\":3}},{\"id\":\"OSN03pvxKl\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Energy KWh\",\"col\":3}},{\"id\":\"m6FzEhEOFW\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Rental Days\",\"col\":3}},{\"id\":\"3DJesjRtJr\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"STK Push\",\"col\":3}},{\"id\":\"iFifzeazHN\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Driver Commission Ledger\",\"col\":3}},{\"id\":\"dUwGq17kXU\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Asset Repair\",\"col\":3}},{\"id\":\"jbHvtnYk9r\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Songa Customization Settings\",\"col\":3}}]",
+ "content": "[{\"id\":\"dkGtA8JuFG\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h3\\\">Your Shortcuts</span>\",\"col\":12}},{\"id\":\"8yaY1YwSaC\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Driver\",\"col\":3}},{\"id\":\"3DJesjRtJr\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"STK Push\",\"col\":3}},{\"id\":\"jbHvtnYk9r\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Songa Customization Settings\",\"col\":3}},{\"id\":\"svzf30iv9a\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"SoqZUExO-O\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h3\\\">Reports &amp; Masters</span>\",\"col\":12}},{\"id\":\"ZiVD_FmYtu\",\"type\":\"card\",\"data\":{\"card_name\":\"Driver Wallet\",\"col\":4}},{\"id\":\"4AmiQJNmys\",\"type\":\"card\",\"data\":{\"card_name\":\"Asset Repair\",\"col\":4}},{\"id\":\"64sLE6X3kU\",\"type\":\"card\",\"data\":{\"card_name\":\"Settings\",\"col\":4}}]",
  "creation": "2026-03-17 16:12:17.274190",
  "custom_blocks": [],
  "docstatus": 0,
@@ -12,8 +12,116 @@
  "indicator_color": "green",
  "is_hidden": 0,
  "label": "Songa App Integration",
- "links": [],
- "modified": "2026-04-02 10:41:12.694584",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Driver Wallet",
+   "link_count": 4,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Driver",
+   "link_count": 0,
+   "link_to": "Driver",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Driver Commission Ledger",
+   "link_count": 0,
+   "link_to": "Driver Commission Ledger",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Energy KWh",
+   "link_count": 0,
+   "link_to": "Energy KWh",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Rental Days",
+   "link_count": 0,
+   "link_to": "Rental Days",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Asset Repair",
+   "link_count": 3,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Asset",
+   "link_count": 0,
+   "link_to": "Asset",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Asset Type",
+   "link_count": 0,
+   "link_to": "Asset Type",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Severity Type",
+   "link_count": 0,
+   "link_to": "Severity Type",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Settings",
+   "link_count": 1,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Songa Customization Settings",
+   "link_count": 0,
+   "link_to": "Songa Customization Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-06-26 17:38:21.552126",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Songa App Integration",
@@ -34,14 +142,6 @@
    "type": "DocType"
   },
   {
-   "color": "Green",
-   "doc_view": "List",
-   "label": "Asset Repair",
-   "link_to": "Asset Repair",
-   "stats_filter": "[]",
-   "type": "DocType"
-  },
-  {
    "color": "Grey",
    "doc_view": "List",
    "label": "Songa Customization Settings",
@@ -49,34 +149,10 @@
    "type": "DocType"
   },
   {
-   "color": "Green",
-   "doc_view": "List",
-   "label": "Energy KWh",
-   "link_to": "Energy KWh",
-   "stats_filter": "[]",
-   "type": "DocType"
-  },
-  {
-   "color": "Green",
-   "doc_view": "List",
-   "label": "Rental Days",
-   "link_to": "Rental Days",
-   "stats_filter": "[]",
-   "type": "DocType"
-  },
-  {
    "color": "Orange",
    "doc_view": "List",
    "label": "STK Push",
    "link_to": "Mpesa Express Request",
-   "stats_filter": "[]",
-   "type": "DocType"
-  },
-  {
-   "color": "Blue",
-   "doc_view": "List",
-   "label": "Driver Commission Ledger",
-   "link_to": "Driver Commission Ledger",
    "stats_filter": "[]",
    "type": "DocType"
   }
