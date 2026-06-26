@@ -1,0 +1,21 @@
+{
+ "aggregate_function_based_on": "amount",
+ "creation": "2026-06-26 23:09:00.000000",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "document_type": "Mpesa Express Request",
+ "filters_json": "[[\"Mpesa Express Request\",\"status\",\"=\",\"Completed\"],[\"Mpesa Express Request\",\"reference_doctype\",\"in\",[\"Rental Days\",\"Energy KWh\"]],[\"Mpesa Express Request\",\"docstatus\",\"=\",1],[\"Mpesa Express Request\",\"modified\",\"Timespan\",\"this month\"]]",
+ "function": "Sum",
+ "idx": 0,
+ "is_public": 1,
+ "is_standard": 1,
+ "label": "M-Pesa Recharges (This Month)",
+ "modified": "2026-06-26 23:09:00.000000",
+ "modified_by": "Administrator",
+ "module": "Songa App Integration",
+ "name": "M-Pesa Recharges (This Month)",
+ "owner": "Administrator",
+ "show_percentage_stats": 1,
+ "stats_time_interval": "Monthly",
+ "type": "Document Type"
+}

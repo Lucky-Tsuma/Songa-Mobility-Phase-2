@@ -1,0 +1,38 @@
+{
+ "cards": [
+  {
+   "card": "Active Drivers"
+  },
+  {
+   "card": "Pending Commission Approvals"
+  },
+  {
+   "card": "M-Pesa Recharges (This Month)"
+  },
+  {
+   "card": "Failed STK Push (Last 7 Days)"
+  }
+ ],
+ "charts": [
+  {
+   "chart": "STK Push Outcomes",
+   "width": "Half"
+  },
+  {
+   "chart": "Commission Ledger by Status",
+   "width": "Half"
+  }
+ ],
+ "creation": "2026-06-26 23:09:00.000000",
+ "dashboard_name": "Songa Driver Wallets Dashboard",
+ "docstatus": 0,
+ "doctype": "Dashboard",
+ "idx": 0,
+ "is_default": 0,
+ "is_standard": 1,
+ "modified": "2026-06-26 23:50:00.000000",
+ "modified_by": "Administrator",
+ "module": "Songa App Integration",
+ "name": "Songa Driver Wallets Dashboard",
+ "owner": "Administrator"
+}

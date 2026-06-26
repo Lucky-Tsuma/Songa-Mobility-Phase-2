@@ -1,0 +1,21 @@
+{
+ "creation": "2026-06-26 23:09:00.000000",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "document_type": "Mpesa Express Request",
+ "dynamic_filters_json": "[[\"Mpesa Express Request\",\"modified\",\">=\",\"frappe.datetime.add_days(frappe.datetime.now_date(), -7)\"]]",
+ "filters_json": "[[\"Mpesa Express Request\",\"status\",\"=\",\"Failed\"],[\"Mpesa Express Request\",\"reference_doctype\",\"in\",[\"Rental Days\",\"Energy KWh\"]],[\"Mpesa Express Request\",\"docstatus\",\"=\",1]]",
+ "function": "Count",
+ "idx": 0,
+ "is_public": 1,
+ "is_standard": 1,
+ "label": "Failed STK Push (Last 7 Days)",
+ "modified": "2026-06-26 23:55:00.000000",
+ "modified_by": "Administrator",
+ "module": "Songa App Integration",
+ "name": "Failed STK Push (Last 7 Days)",
+ "owner": "Administrator",
+ "show_percentage_stats": 0,
+ "stats_time_interval": "Weekly",
+ "type": "Document Type"
+}

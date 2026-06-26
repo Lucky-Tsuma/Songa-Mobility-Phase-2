@@ -3,7 +3,12 @@ import json
 import frappe
 import requests
 from erpnext.accounts.party import get_party_account
-from erpnext.accounts.utils import get_balance_on
+
+from songa_mobility_phase_2.songa_app_integration.report_helpers import (
+	get_commission_balance,
+	get_energy_kwh_balance,
+	get_rental_days_balance,
+)
 
 
 def get_driver_commission_account():
@@ -286,11 +291,7 @@ def get_commission_balance_by_driver(driver_id=None, company=None):
 		if not supplier:
 			frappe.throw("Driver does not have an associated supplier")
 
-		raw_balance = get_balance_on(
-			party_type="Supplier", party=supplier, date=frappe.utils.today(), company=company
-		)
-
-		balance = -raw_balance if raw_balance != 0 else 0
+		balance = get_commission_balance(supplier, company)
 
 		return {"status": "success", "balance": balance}
 	except frappe.ValidationError:
@@ -312,25 +313,7 @@ def get_rental_days_balance_by_driver(driver_id=None):
 		if not frappe.db.exists("Driver", driver_id):
 			frappe.throw("Driver not found")
 
-		recharged_rental_days = (
-			frappe.get_value(
-				"Rental Days",
-				{"driver": driver_id, "docstatus": 1, "transaction_type": "Recharge", "status": "Completed"},
-				"sum(no_of_days)",
-			)
-			or 0
-		)
-
-		used_rental_days = (
-			frappe.get_value(
-				"Rental Days",
-				{"driver": driver_id, "docstatus": 1, "transaction_type": "Usage", "status": "Completed"},
-				"sum(no_of_days)",
-			)
-			or 0
-		)
-
-		rental_days_balance = recharged_rental_days - used_rental_days
+		rental_days_balance = get_rental_days_balance(driver_id)
 
 		return {"status": "success", "total_rental_days": rental_days_balance or 0}
 
@@ -353,25 +336,7 @@ def get_energy_kwh_balance_by_driver(driver_id=None):
 		if not frappe.db.exists("Driver", driver_id):
 			frappe.throw("Driver not found")
 
-		recharged_kwh = (
-			frappe.get_value(
-				"Energy KWh",
-				{"driver": driver_id, "docstatus": 1, "transaction_type": "Recharge", "status": "Completed"},
-				"sum(energy_qty)",
-			)
-			or 0
-		)
-
-		used_kwh = (
-			frappe.get_value(
-				"Energy KWh",
-				{"driver": driver_id, "docstatus": 1, "transaction_type": "Usage", "status": "Completed"},
-				"sum(energy_qty)",
-			)
-			or 0
-		)
-
-		total_kwh_balance = recharged_kwh - used_kwh
+		total_kwh_balance = get_energy_kwh_balance(driver_id)
 
 		return {"status": "success", "total_kwh": total_kwh_balance or 0}
 
