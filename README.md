@@ -52,6 +52,7 @@ After install, open **Songa Customization Settings** (from the workspace) and co
 ---
 
 ## Workspace
+<img width="2424" height="1680" alt="image" src="https://github.com/user-attachments/assets/b45c153c-bdd5-496f-add3-9c98d5d02dbf" />
 
 **Songa App Integration** is the main entry point in Desk.
 
