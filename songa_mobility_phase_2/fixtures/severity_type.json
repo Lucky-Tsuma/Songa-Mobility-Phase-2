@@ -9,13 +9,6 @@
  {
   "docstatus": 0,
   "doctype": "Severity Type",
-  "modified": "2026-04-02 10:47:18.762639",
-  "name": "2",
-  "severity_type": "MEDIUM"
- },
- {
-  "docstatus": 0,
-  "doctype": "Severity Type",
   "modified": "2026-04-02 10:48:02.122228",
   "name": "4",
   "severity_type": "CRITICAL"
@@ -26,5 +19,12 @@
   "modified": "2026-04-02 10:47:40.230917",
   "name": "3",
   "severity_type": "SERIOUS"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Severity Type",
+  "modified": "2026-04-02 10:47:18.762639",
+  "name": "2",
+  "severity_type": "MEDIUM"
  }
 ]

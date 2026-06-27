@@ -152,5 +152,12 @@
   "modified": "2024-03-06 20:09:15.714708",
   "name": "Reject",
   "workflow_action_name": "Reject"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-03-26 23:18:19.934044",
+  "name": "Escalate for Budget Approval",
+  "workflow_action_name": "Escalate for Budget Approval"
  }
 ]

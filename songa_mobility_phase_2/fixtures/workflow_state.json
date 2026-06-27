@@ -236,29 +236,11 @@
  {
   "docstatus": 0,
   "doctype": "Workflow State",
-  "icon": "ok-sign",
-  "modified": "2024-03-06 20:09:15.692202",
-  "name": "Approved",
-  "style": "Success",
-  "workflow_state_name": "Approved"
- },
- {
-  "docstatus": 0,
-  "doctype": "Workflow State",
   "icon": "",
   "modified": "2026-01-07 10:44:23.272164",
   "name": "Pending Approval HM",
   "style": "Primary",
   "workflow_state_name": "Pending Approval HM"
- },
- {
-  "docstatus": 0,
-  "doctype": "Workflow State",
-  "icon": "",
-  "modified": "2026-04-23 15:24:32.022669",
-  "name": "Pending Approval - Lead Technician",
-  "style": "",
-  "workflow_state_name": "Pending Approval - Lead Technician"
  },
  {
   "docstatus": 0,
@@ -304,5 +286,32 @@
   "name": "Completed",
   "style": "Success",
   "workflow_state_name": "Completed"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
+  "modified": "2026-04-23 15:24:32.022669",
+  "name": "Pending Approval - Lead Technician",
+  "style": "",
+  "workflow_state_name": "Pending Approval - Lead Technician"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "ok-sign",
+  "modified": "2024-03-06 20:09:15.692202",
+  "name": "Approved",
+  "style": "Success",
+  "workflow_state_name": "Approved"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
+  "modified": "2026-02-11 14:44:33.322867",
+  "name": "Pending Amendment",
+  "style": "",
+  "workflow_state_name": "Pending Amendment"
  }
 ]

@@ -1,12 +1,5 @@
 [
  {
-  "asset_type": "TRIKE",
-  "docstatus": 0,
-  "doctype": "Asset Type",
-  "modified": "2026-03-31 10:13:46.970644",
-  "name": "1"
- },
- {
   "asset_type": "TILLER",
   "docstatus": 0,
   "doctype": "Asset Type",
@@ -47,5 +40,12 @@
   "doctype": "Asset Type",
   "modified": "2026-03-31 10:14:18.556978",
   "name": "2"
+ },
+ {
+  "asset_type": "TRIKE",
+  "docstatus": 0,
+  "doctype": "Asset Type",
+  "modified": "2026-03-31 10:13:46.970644",
+  "name": "1"
  }
 ]
