@@ -6,3 +6,6 @@ tags
 node_modules
 __pycache__
 context_files
+docs
+postman
+scripts

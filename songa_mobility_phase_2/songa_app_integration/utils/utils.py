@@ -75,7 +75,7 @@ def _get_company(company):
 	return frappe.defaults.get_user_default("company")
 
 @frappe.whitelist(allow_guest=False)
-def allocate_commission(driver_commission_ledger_name):
+def allocate_commission(driver_commission_ledger_name, commit=True):
 	try:
 		driver_commission_ledger = frappe.get_doc("Driver Commission Ledger", driver_commission_ledger_name)
 		driver = driver_commission_ledger.driver
@@ -141,7 +141,8 @@ def allocate_commission(driver_commission_ledger_name):
 			frappe.set_value(
 				"Driver Commission Ledger", driver_commission_ledger_name, "journal_entry", journal_entry.name
 			)
-			frappe.db.commit()
+			if commit:
+				frappe.db.commit()
 		except Exception:
 			frappe.db.rollback(save_point="allocate_commission")
 			raise
@@ -159,7 +160,9 @@ def allocate_commission(driver_commission_ledger_name):
 
 
 @frappe.whitelist(allow_guest=False)
-def deduct_commission(driver_commission_ledger_name, rental_days_record_name=None, KWh_record_name=None):
+def deduct_commission(
+	driver_commission_ledger_name, rental_days_record_name=None, KWh_record_name=None, commit=True
+):
 	try:
 		driver_commission_ledger = frappe.get_doc("Driver Commission Ledger", driver_commission_ledger_name)
 		driver = driver_commission_ledger.driver
@@ -175,6 +178,15 @@ def deduct_commission(driver_commission_ledger_name, rental_days_record_name=Non
 
 		if amount <= 0:
 			frappe.throw("Amount must be greater than zero for deduction")
+
+		if not rental_days_record_name:
+			rental_days_record_name = frappe.db.get_value(
+				"Rental Days", {"driver_commission_ledger": driver_commission_ledger_name}, "name"
+			)
+		if not KWh_record_name:
+			KWh_record_name = frappe.db.get_value(
+				"Energy KWh", {"driver_commission_ledger": driver_commission_ledger_name}, "name"
+			)
 
 		# Lock commission ledger rows for this driver to prevent race conditions
 		# when deduct_commission is called directly as a whitelisted endpoint
@@ -222,7 +234,7 @@ def deduct_commission(driver_commission_ledger_name, rental_days_record_name=Non
 						"debit_in_account_currency": amount,
 						**branch_cost_center_fields,
 						"credit_in_account_currency": 0,
-						"is_advance": "No",
+						"is_advance": "Yes",
 					},
 					{
 						"account": expense_account,
@@ -247,15 +259,23 @@ def deduct_commission(driver_commission_ledger_name, rental_days_record_name=Non
 				frappe.db.set_value(
 					"Rental Days",
 					rental_days_record_name,
-					"driver_commission_ledger",
-					driver_commission_ledger_name,
+					{
+						"driver_commission_ledger": driver_commission_ledger_name,
+						"status": "Completed",
+					},
 				)
 			elif KWh_record_name:
 				frappe.db.set_value(
-					"Energy KWh", KWh_record_name, "driver_commission_ledger", driver_commission_ledger_name
+					"Energy KWh",
+					KWh_record_name,
+					{
+						"driver_commission_ledger": driver_commission_ledger_name,
+						"status": "Completed",
+					},
 				)
 
-			frappe.db.commit()
+			if commit:
+				frappe.db.commit()
 		except Exception:
 			frappe.db.rollback(save_point="deduct_commission")
 			raise

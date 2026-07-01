@@ -44,6 +44,38 @@ def validate_phone_number(phone_number=None):
 	return True
 
 
+def _rollback_savepoint(save_point):
+	try:
+		frappe.db.rollback(save_point=save_point)
+	except Exception:
+		frappe.db.rollback()
+
+
+def _approve_commission_ledger_workflow(ledger_name):
+	"""Approve a Deduction ledger via workflow (Allocation ledgers are never auto-approved)."""
+	previous_user = frappe.session.user
+	try:
+		frappe.set_user("Administrator")
+		doc = frappe.get_doc("Driver Commission Ledger", ledger_name)
+		if doc.workflow_state == "Pending":
+			apply_workflow(doc, "Approve")
+	finally:
+		frappe.set_user(previous_user)
+
+
+def _complete_commission_deduction(ledger_name, rental_days_name=None, energy_kwh_name=None):
+	"""Post commission deduction JE and approve the ledger; completes the wallet recharge."""
+	result = deduct_commission(
+		ledger_name,
+		rental_days_name,
+		energy_kwh_name,
+		commit=False,
+	)
+	if isinstance(result, dict) and result.get("status") == "error":
+		frappe.throw(result.get("message"))
+	_approve_commission_ledger_workflow(ledger_name)
+
+
 @frappe.whitelist(allow_guest=False)
 def allocate_commission():
 	try:
@@ -197,8 +229,6 @@ def recharge_rental_days():
 			rental_days.submit()
 
 			if payment_method == "commission":
-				frappe.set_value("Rental Days", rental_days.name, "status", "Completed")
-
 				driver_commission_ledger = frappe.get_doc(
 					{
 						"doctype": "Driver Commission Ledger",
@@ -211,8 +241,10 @@ def recharge_rental_days():
 				)
 				driver_commission_ledger.insert()
 
-				deduct_commission(driver_commission_ledger.name, rental_days.name)
-				apply_workflow(driver_commission_ledger, "Approve")
+				_complete_commission_deduction(
+					driver_commission_ledger.name,
+					rental_days_name=rental_days.name,
+				)
 
 			elif payment_method == "mpesa":
 				# Rental days have been saved as draft, will be submitted later after payment is confirmed.
@@ -241,7 +273,7 @@ def recharge_rental_days():
 			frappe.db.commit()
 
 		except Exception:
-			frappe.db.rollback(save_point="recharge_rental_days")
+			_rollback_savepoint("recharge_rental_days")
 			raise
 
 		if payment_method == "mpesa":
@@ -252,15 +284,13 @@ def recharge_rental_days():
 				"mpesa_request": mpesa_express_request.name,
 			}
 
-		total_rental_days_balance = get_rental_days_balance_by_driver(driver_id=driver_id)
-
-		if total_rental_days_balance["status"] == "error":
-			return total_rental_days_balance
-
 		return {
 			"status": "success",
-			"message": "Rental days recharged successfully.",
-			"total_rental_days_balance": total_rental_days_balance.get("total_rental_days", 0),
+			"message": "Rental days recharged successfully",
+			"commission_ledger": driver_commission_ledger.name,
+			"total_rental_days_balance": get_rental_days_balance_by_driver(driver_id=driver_id).get(
+				"total_rental_days", 0
+			),
 		}
 
 	except Exception as e:
@@ -283,7 +313,7 @@ def recharge_kwh():
 		payment_method = data.get("payment_method")
 		phone_number = data.get("phone_number")
 
-		mandatory_fields = ["driver_id", "amount", "kwh"]
+		mandatory_fields = ["driver_id", "amount", "kwh", "payment_method"]
 
 		if payment_method == "mpesa":
 			mandatory_fields.append("phone_number")
@@ -364,8 +394,6 @@ def recharge_kwh():
 			energy_kwh.submit()
 
 			if payment_method == "commission":
-				frappe.set_value("Energy KWh", energy_kwh.name, "status", "Completed")
-
 				driver_commission_ledger = frappe.get_doc(
 					{
 						"doctype": "Driver Commission Ledger",
@@ -378,8 +406,10 @@ def recharge_kwh():
 				)
 				driver_commission_ledger.insert()
 
-				deduct_commission(driver_commission_ledger.name, None, energy_kwh.name)
-				apply_workflow(driver_commission_ledger, "Approve")
+				_complete_commission_deduction(
+					driver_commission_ledger.name,
+					energy_kwh_name=energy_kwh.name,
+				)
 
 			elif payment_method == "mpesa":
 				frappe.set_value("Energy KWh", energy_kwh.name, "status", "In Progress")
@@ -406,26 +436,21 @@ def recharge_kwh():
 			frappe.db.commit()
 
 		except Exception:
-			frappe.db.rollback(save_point="recharge_kwh")
+			_rollback_savepoint("recharge_kwh")
 			raise
 
 		if payment_method == "mpesa":
-			# Retuen early - the balance has not changed yet
 			return {
 				"status": "pending",
 				"message": "M-Pesa payment initiated. Energy KWh will be recharged once payment is confirmed.",
 				"mpesa_request": mpesa_express_request.name,
 			}
 
-		kwh_balance = get_energy_kwh_balance_by_driver(driver_id=driver_id)
-
-		if kwh_balance["status"] == "error":
-			return kwh_balance
-
 		return {
 			"status": "success",
-			"message": "kWh recharged successfully.",
-			"kwh_balance": kwh_balance.get("total_kwh", 0),
+			"message": "Energy kWh recharged successfully",
+			"commission_ledger": driver_commission_ledger.name,
+			"kwh_balance": get_energy_kwh_balance_by_driver(driver_id=driver_id).get("total_kwh", 0),
 		}
 
 	except Exception as e:
@@ -611,7 +636,13 @@ def _cancel_document(doctype, document_id, id_field):
 			)
 			journal_entry = frappe.get_doc("Journal Entry", driver_commission_ledger.journal_entry)
 
-			apply_workflow(driver_commission_ledger, "Cancel")
+			previous_user = frappe.session.user
+			try:
+				frappe.set_user("Administrator")
+				apply_workflow(driver_commission_ledger, "Cancel")
+			finally:
+				frappe.set_user(previous_user)
+
 			journal_entry.flags.ignore_links = True
 			journal_entry.cancel()
 		elif doc.mpesa_express_request:
@@ -620,7 +651,7 @@ def _cancel_document(doctype, document_id, id_field):
 			mpesa_express_request.cancel()
 
 	except Exception:
-		frappe.db.rollback(save_point=savepoint)
+		_rollback_savepoint(savepoint)
 		raise
 
 	frappe.db.commit()

@@ -302,7 +302,7 @@ POST /api/method/songa_mobility_phase_2.songa_app_integration.api.api.<method>
 Content-Type: application/json
 ```
 
-**Response shape:** `{ "status": "success" | "error" | "pending", "message": "...", ... }`  
+**Response shape:** `{ "status": "success" | "error", "message": "...", ... }`  
 HTTP codes on errors: `400` · `403` · `404` · `500`
 
 ---
@@ -336,7 +336,7 @@ Create a commission allocation ledger entry *(awaiting approval)*.
 | `company` | — | |
 
 - **Commission** — validates balance, submits Rental Days, auto-approves Deduction ledger
-- **M-Pesa** — returns `"status": "pending"` with `mpesa_request` until STK push completes
+- **M-Pesa** — returns `"status": "success"` with `mpesa_request`; wallet credits after STK push confirms
 
 <br>
 
