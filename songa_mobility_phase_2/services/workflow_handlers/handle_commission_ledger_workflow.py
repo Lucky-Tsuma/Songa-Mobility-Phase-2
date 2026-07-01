@@ -12,7 +12,23 @@ from songa_mobility_phase_2.songa_app_integration.utils.utils import (
 TRIGGERED_STATES = {"Approved", "Rejected"}
 
 
+def _post_deduction_if_needed(doc):
+	if (
+		doc.transaction_type == "Deduction"
+		and doc.workflow_state == "Approved"
+		and not doc.journal_entry
+	):
+		from songa_mobility_phase_2.songa_app_integration.utils.utils import deduct_commission
+
+		result = deduct_commission(doc.name)
+		if isinstance(result, dict) and result.get("status") == "error":
+			frappe.throw(result.get("message"))
+
+
 def handle_commission_ledger_workflow(doc, method):
+	if doc.has_value_changed("workflow_state"):
+		_post_deduction_if_needed(doc)
+
 	if not doc.has_value_changed("workflow_state") or doc.workflow_state not in TRIGGERED_STATES:
 		return
 
