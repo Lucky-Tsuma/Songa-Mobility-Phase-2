@@ -4,7 +4,7 @@
   "doctype": "Workflow",
   "document_type": "Asset Repair",
   "is_active": 1,
-  "modified": "2026-04-27 15:34:47.548534",
+  "modified": "2026-07-01 16:03:38.305660",
   "name": "Asset Repair",
   "override_status": 0,
   "send_email_alert": 0,
@@ -315,19 +315,6 @@
     "parenttype": "Workflow",
     "send_email_to_creator": 0,
     "state": "Approved",
-    "workflow_builder_id": null
-   },
-   {
-    "action": "Cancel",
-    "allow_self_approval": 1,
-    "allowed": "Hub Manager",
-    "condition": null,
-    "next_state": "Cancelled",
-    "parent": "Asset Repair",
-    "parentfield": "transitions",
-    "parenttype": "Workflow",
-    "send_email_to_creator": 0,
-    "state": "Completed",
     "workflow_builder_id": null
    }
   ],

@@ -299,19 +299,19 @@
  {
   "docstatus": 0,
   "doctype": "Workflow State",
-  "icon": "ok-sign",
-  "modified": "2024-03-06 20:09:15.692202",
-  "name": "Approved",
-  "style": "Success",
-  "workflow_state_name": "Approved"
- },
- {
-  "docstatus": 0,
-  "doctype": "Workflow State",
   "icon": "",
   "modified": "2026-02-11 14:44:33.322867",
   "name": "Pending Amendment",
   "style": "",
   "workflow_state_name": "Pending Amendment"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "ok-sign",
+  "modified": "2024-03-06 20:09:15.692202",
+  "name": "Approved",
+  "style": "Success",
+  "workflow_state_name": "Approved"
  }
 ]
