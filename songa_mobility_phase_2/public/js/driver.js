@@ -33,7 +33,7 @@ const filterSongaDrivers = (frm) => {
     frm.set_query("custom_supplier_group", function() {
         return {
             filters: {
-                "parent_supplier_group": "Songa Drivers",
+                "parent_supplier_group": "Drivers / Collectors",
                 "is_group": 0
             }
         };
