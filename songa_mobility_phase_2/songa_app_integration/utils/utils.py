@@ -74,6 +74,54 @@ def _get_company(company):
 			pass
 	return frappe.defaults.get_user_default("company")
 
+def reconcile_payments(driver_id):
+	try:
+		if not driver_id:
+			frappe.throw("driver_id is required")
+		if not frappe.db.exists("Driver", driver_id):
+			frappe.throw("Driver not found")
+		supplier = frappe.db.get_value("Driver", driver_id, "transporter")
+		if not supplier:
+			frappe.throw("Driver does not have an associated supplier")
+
+		company = frappe.defaults.get_user_default("company")
+
+		if not company:
+			frappe.throw("Default company is not set for current user")
+
+		reconcile_doc = frappe.new_doc("Payment Reconciliation")
+		reconcile_doc.party_type = "Supplier"
+		reconcile_doc.party = supplier
+		reconcile_doc.company = company
+		reconcile_doc.receivable_payable_account = get_supplier_party_account(
+			supplier=supplier, company=company
+		)
+
+		reconcile_doc.get_unreconciled_entries()
+
+		if not reconcile_doc.invoices or not reconcile_doc.payments:
+			frappe.log_error("No invoices or payments found for driver", "Reconcile Payments Error")
+			return {"status": "error", "message": "No invoices or payments found for driver"}
+
+		args = {
+			"invoices": [invoice.as_dict() for invoice in reconcile_doc.invoices],
+			"payments": [payment.as_dict() for payment in reconcile_doc.payments],
+		}
+
+		if not args["invoices"] or not args["payments"]:
+			frappe.log_error("No invoices or payments found for driver", "Reconcile Payments Error")
+			return {"status": "error", "message": "No invoices or payments found for driver"}
+
+		reconcile_doc.allocate_entries(args)
+		reconcile_doc.reconcile()
+		frappe.db.commit()
+	except frappe.ValidationError:
+		raise
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Reconcile Payments Error")
+		return {"status": "error", "message": str(e)}
+
+
 @frappe.whitelist(allow_guest=False)
 def allocate_commission(driver_commission_ledger_name, commit=True):
 	try:
@@ -152,6 +200,8 @@ def allocate_commission(driver_commission_ledger_name, commit=True):
 			"message": "Commission allocated successfully.",
 			"data": journal_entry.name,
 		}
+
+		reconcile_payments(driver_id=driver)
 	except frappe.ValidationError:
 		raise
 	except Exception as e:
@@ -276,6 +326,8 @@ def deduct_commission(
 
 			if commit:
 				frappe.db.commit()
+
+			reconcile_payments(driver_id=driver)
 		except Exception:
 			frappe.db.rollback(save_point="deduct_commission")
 			raise
