@@ -10,6 +10,24 @@
   "stk_push_payment_gateway",
   "column_break_lpcu",
   "songa_webhook_endpoint",
+  "battery_swap_tab",
+  "commission_battery_swap_section",
+  "battery_swap_commission_debit",
+  "column_break_okwx",
+  "battery_swap_commission_credit",
+  "mpesa_battery_swap_section",
+  "battery_swap_mpesa_debit",
+  "column_break_wegn",
+  "battery_swap_mpesa_credit",
+  "rental_recharge_tab",
+  "commission_rental_recharge_section",
+  "rental_recharge_commission_debit",
+  "column_break_ntnt",
+  "rental_recharge_commission_credit",
+  "mpesa_rental_recharge_section",
+  "rental_recharge_mpesa_debit",
+  "column_break_plqj",
+  "rental_recharge_mpesa_credit",
   "asset_repair_tab",
   "stock_expense_accounts_section",
   "lease_to_own",
@@ -29,7 +47,8 @@
    "fieldname": "stk_push_payment_gateway",
    "fieldtype": "Link",
    "label": "STK Push payment gateway",
-   "options": "Payment Gateway"
+   "options": "Payment Gateway",
+   "reqd": 1
   },
   {
    "fieldname": "songa_webhook_endpoint",
@@ -71,13 +90,115 @@
    "fieldtype": "Link",
    "label": "Internal consumption",
    "options": "Account"
+  },
+  {
+   "fieldname": "mpesa_battery_swap_section",
+   "fieldtype": "Section Break",
+   "label": "Mpesa"
+  },
+  {
+   "fieldname": "battery_swap_mpesa_debit",
+   "fieldtype": "Link",
+   "label": "Debit Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_wegn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "battery_swap_tab",
+   "fieldtype": "Tab Break",
+   "label": "Battery Swap"
+  },
+  {
+   "fieldname": "battery_swap_mpesa_credit",
+   "fieldtype": "Link",
+   "label": "Credit Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "commission_battery_swap_section",
+   "fieldtype": "Section Break",
+   "label": "Commission"
+  },
+  {
+   "fieldname": "battery_swap_commission_debit",
+   "fieldtype": "Link",
+   "label": "Debit Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_okwx",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "battery_swap_commission_credit",
+   "fieldtype": "Link",
+   "label": "Credit Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "rental_recharge_tab",
+   "fieldtype": "Tab Break",
+   "label": "Rental Recharge"
+  },
+  {
+   "fieldname": "commission_rental_recharge_section",
+   "fieldtype": "Section Break",
+   "label": "Commission"
+  },
+  {
+   "fieldname": "rental_recharge_commission_debit",
+   "fieldtype": "Link",
+   "label": "Debit Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_ntnt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "rental_recharge_commission_credit",
+   "fieldtype": "Link",
+   "label": "Credit Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "mpesa_rental_recharge_section",
+   "fieldtype": "Section Break",
+   "label": "Mpesa"
+  },
+  {
+   "fieldname": "rental_recharge_mpesa_debit",
+   "fieldtype": "Link",
+   "label": "Debit Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_plqj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "rental_recharge_mpesa_credit",
+   "fieldtype": "Link",
+   "label": "Credit Account",
+   "options": "Account",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-06-08 10:58:13.107854",
+ "modified": "2026-07-12 20:24:19.889380",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Songa Customization Settings",
