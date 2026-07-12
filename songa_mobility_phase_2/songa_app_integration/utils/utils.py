@@ -39,6 +39,34 @@ def get_supplier_party_account(supplier, company):
 		frappe.log_error(frappe.get_traceback(), "Get Accounts Error")
 		frappe.throw(str(e))
 
+
+def get_commission_deduction_accounts(rental_days_record_name=None, KWh_record_name=None):
+	"""Return debit/credit accounts for a commission deduction based on recharge type."""
+	settings = frappe.get_single("Songa Customization Settings")
+
+	if rental_days_record_name:
+		debit_account = settings.rental_recharge_commission_debit
+		credit_account = settings.rental_recharge_commission_credit
+		if not debit_account or not credit_account:
+			frappe.throw(
+				"Please set Rental Recharge Commission Debit and Credit accounts on Songa Customization Settings"
+			)
+		return debit_account, credit_account
+
+	if KWh_record_name:
+		debit_account = settings.battery_swap_commission_debit
+		credit_account = settings.battery_swap_commission_credit
+		if not debit_account or not credit_account:
+			frappe.throw(
+				"Please set Battery Swap Commission Debit and Credit accounts on Songa Customization Settings"
+			)
+		return debit_account, credit_account
+
+	frappe.throw(
+		"Cannot determine commission deduction accounts. "
+		"A Rental Days or Energy KWh record is required."
+	)
+
 def _get_driver_id(driver_id):
 	# direct function calls - driver_id as argument
 	if driver_id:
@@ -218,7 +246,6 @@ def deduct_commission(
 		driver = driver_commission_ledger.driver
 		supplier = frappe.db.get_value("Driver", driver, "transporter")
 		amount = driver_commission_ledger.amount
-		company = driver_commission_ledger.company
 
 		if not frappe.db.exists("Driver", driver_commission_ledger.driver):
 			frappe.throw("Driver not found")
@@ -255,9 +282,9 @@ def deduct_commission(
 				f"Insufficient commission balance. Available balance: {commission_balance['balance']}"
 			)
 
-		expense_account, liability_account = (
-			get_driver_commission_account(),
-			get_supplier_party_account(supplier=supplier, company=company),
+		debit_account, credit_account = get_commission_deduction_accounts(
+			rental_days_record_name=rental_days_record_name,
+			KWh_record_name=KWh_record_name,
 		)
 
 		branch_and_cost_center_dict = get_branch_and_cost_center_by_supplier(supplier=supplier)
@@ -278,16 +305,16 @@ def deduct_commission(
 				"user_remark": f"Commission deduction for driver {driver_commission_ledger.driver} - Driver Commission Ledger {driver_commission_ledger.name}",
 				"accounts": [
 					{
-						"account": liability_account,
+						"account": debit_account,
+						"debit_in_account_currency": amount,
 						"party_type": "Supplier",
 						"party": supplier,
-						"debit_in_account_currency": amount,
 						**branch_cost_center_fields,
 						"credit_in_account_currency": 0,
-						"is_advance": "Yes",
+						"is_advance": "No",
 					},
 					{
-						"account": expense_account,
+						"account": credit_account,
 						"debit_in_account_currency": 0,
 						"credit_in_account_currency": amount,
 						**branch_cost_center_fields,
