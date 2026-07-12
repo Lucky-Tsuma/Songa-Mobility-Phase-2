@@ -6,6 +6,18 @@ import requests
 
 from songa_mobility_phase_2.songa_app_integration.utils.utils import get_commission_balance_by_driver
 
+_songa_webhook_logger = None
+
+
+def get_songa_webhook_logger():
+	"""Return a shared Songa webhook logger for this module."""
+	global _songa_webhook_logger
+	if _songa_webhook_logger is None:
+		frappe.utils.logger.set_log_level("INFO")
+		_songa_webhook_logger = frappe.logger("songa_webhook_log", allow_site=True, file_count=20)
+	return _songa_webhook_logger
+
+
 def clean_comment(html):
 	# Replace block-level tags with newlines before stripping
 	html = re.sub(r"<br\s*/?>", "\n", html)
@@ -34,9 +46,6 @@ def on_comment_update(doc, method):
 				)
 				return
 
-			frappe.utils.logger.set_log_level("INFO")
-			songa_webhook_logger = frappe.logger("songa_webhook_log", allow_site=True, file_count=20)
-
 			asset_repair_id = frappe.db.get_value(
 				"Asset Repair", doc.reference_name, "custom_asset_repair_id"
 			) or doc.reference_name
@@ -61,7 +70,7 @@ def on_comment_update(doc, method):
 				)
 				return
 
-			songa_webhook_logger.info(
+			get_songa_webhook_logger().info(
 				f"New comment on {doc.reference_doctype} - {doc.reference_name} by {doc.owner}. Content: {clean_content}\n"
 			)
 
@@ -99,9 +108,6 @@ def on_asset_repair_update(doc, method):
 					"Asset Repair Completion",
 				)
 				return
-
-			frappe.utils.logger.set_log_level("INFO")
-			songa_webhook_logger = frappe.logger("songa_webhook_log", allow_site=True, file_count=20)
 
 			payload = {
 				"action_type": "Service Completed" if doc.repair_status == "Completed" else "Service Cancelled",
@@ -144,7 +150,7 @@ def on_asset_repair_update(doc, method):
 				)
 				return
 
-			songa_webhook_logger.info(
+			get_songa_webhook_logger().info(
 				f"Asset Repair Completed - {doc.name} for Asset {doc.asset}. Sent completion event to Songa. Payload: {payload}"
 			)
 
@@ -223,7 +229,7 @@ def on_payment_entry_submit(doc, method):
 		supplier_group = frappe.db.get_value("Supplier", doc.party, "supplier_group")
 		if supplier_group:
 			parent_supplier_group = frappe.db.get_value("Supplier Group", supplier_group, "parent_supplier_group")
-			if parent_supplier_group == "Songa Drivers":
+			if parent_supplier_group == "Drivers / Collectors":
 				driver_id = frappe.db.get_value("Driver", {"transporter": doc.party}, "name")
 				if driver_id:
 					commission_balance = get_commission_balance_by_driver(driver_id)
@@ -239,9 +245,6 @@ def on_payment_entry_submit(doc, method):
 									message=f"Songa webhook endpoint not found, please check Songa Customization Settings",
 								)
 								return
-							
-							frappe.utils.logger.set_log_level("INFO")
-							songa_webhook_logger = frappe.logger("songa_webhook_log", allow_site=True, file_count=20)
 
 							payload = {
 								"action_type": "Commission Deduction",
@@ -261,7 +264,7 @@ def on_payment_entry_submit(doc, method):
 								)
 								return
 
-							songa_webhook_logger.info(
+							get_songa_webhook_logger().info(
 								f"Payment Entry Submitted - {doc.name} for Driver {driver_id}. Sent commission deduction event to Songa."
 							)
 						except Exception as e:
@@ -314,9 +317,6 @@ def on_journal_entry_submit(doc, method):
 				)
                 return
 
-            frappe.utils.logger.set_log_level("INFO")
-            songa_webhook_logger = frappe.logger("songa_webhook_log", allow_site=True, file_count=20)
-
             payload = {
                 "action_type": "Commission Deduction",
                 "driver_id": driver_id,
@@ -335,7 +335,7 @@ def on_journal_entry_submit(doc, method):
                 )
                 return
 
-            songa_webhook_logger.info(
+            get_songa_webhook_logger().info(
                 f"Journal Entry Submitted - {doc.name} for Driver {driver_id}. Sent commission deduction event to Songa."
             )
         except Exception as e:

@@ -1,3 +1,4 @@
+import inspect
 import json
 import re
 
@@ -11,13 +12,36 @@ from ..utils.utils import (
 	get_rental_days_balance_by_driver,
 )
 
+_songa_inbound_requests_logger = None
+
+
+def get_songa_inbound_requests_logger():
+	"""Return a shared logger for inbound Songa API requests."""
+	global _songa_inbound_requests_logger
+	if _songa_inbound_requests_logger is None:
+		frappe.utils.logger.set_log_level("INFO")
+		_songa_inbound_requests_logger = frappe.logger(
+			"songa_inbound_requests", allow_site=True, file_count=50
+		)
+	return _songa_inbound_requests_logger
+
+
+def _log_inbound_request(endpoint, payload):
+	get_songa_inbound_requests_logger().info(
+		f"Endpoint: {endpoint} | Payload: {payload}"
+	)
+
 
 def check_for_empty_payload():
+	endpoint = inspect.currentframe().f_back.f_code.co_name
+
 	if not frappe.request.data:
+		_log_inbound_request(endpoint, None)
 		frappe.local.response["http_status_code"] = 400
 		return {"status": "error", "message": "No data provided"}
 
 	data = json.loads(frappe.request.data)
+	_log_inbound_request(endpoint, data)
 
 	if not data:
 		frappe.local.response["http_status_code"] = 400
