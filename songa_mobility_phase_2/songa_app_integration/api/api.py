@@ -76,6 +76,40 @@ def _complete_commission_deduction(ledger_name, rental_days_name=None, energy_kw
 	_approve_commission_ledger_workflow(ledger_name)
 
 
+RECHARGE_ACCOUNT_FIELDS = {
+	"battery_swap": {
+		"commission": ("battery_swap_commission_debit", "battery_swap_commission_credit"),
+		"mpesa": ("battery_swap_mpesa_debit", "battery_swap_mpesa_credit"),
+	},
+	"rental_recharge": {
+		"commission": ("rental_recharge_commission_debit", "rental_recharge_commission_credit"),
+		"mpesa": ("rental_recharge_mpesa_debit", "rental_recharge_mpesa_credit"),
+	},
+}
+
+
+def _validate_recharge_account_settings(product, payment_method):
+	"""Ensure Songa Customization Settings has debit/credit accounts for the recharge path."""
+	fields = RECHARGE_ACCOUNT_FIELDS.get(product, {}).get(payment_method)
+	if not fields:
+		return None
+
+	settings = frappe.get_single("Songa Customization Settings")
+	missing = [field for field in fields if not settings.get(field)]
+	if not missing:
+		return None
+
+	labels = [frappe.unscrub(field) for field in missing]
+	frappe.local.response["http_status_code"] = 500
+	return {
+		"status": "error",
+		"message": (
+			"Please set the following accounts on Songa Customization Settings: "
+			+ ", ".join(labels)
+		),
+	}
+
+
 @frappe.whitelist(allow_guest=False)
 def allocate_commission():
 	try:
@@ -158,6 +192,10 @@ def recharge_rental_days():
 		if payment_method not in ("commission", "mpesa"):
 			frappe.local.response["http_status_code"] = 400
 			return {"status": "error", "message": "Invalid payment method. Must be 'commission' or 'mpesa'"}
+
+		account_settings_error = _validate_recharge_account_settings("rental_recharge", payment_method)
+		if account_settings_error:
+			return account_settings_error
 
 		driver = frappe.db.get_value("Driver", driver_id, "name")
 
@@ -323,6 +361,10 @@ def recharge_kwh():
 		if payment_method not in ("commission", "mpesa"):
 			frappe.local.response["http_status_code"] = 400
 			return {"status": "error", "message": "Invalid payment method. Must be 'commission' or 'mpesa'"}
+
+		account_settings_error = _validate_recharge_account_settings("battery_swap", payment_method)
+		if account_settings_error:
+			return account_settings_error
 
 		driver = frappe.db.get_value("Driver", driver_id, "name")
 
