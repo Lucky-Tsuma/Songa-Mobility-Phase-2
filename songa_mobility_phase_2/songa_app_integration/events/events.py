@@ -1,23 +1,12 @@
-import json
 import re
 
 import frappe
-import requests
+from frappe import _
 
+from songa_mobility_phase_2.songa_app_integration.utils.songa_webhook import send_songa_webhook
 from songa_mobility_phase_2.songa_app_integration.utils.utils import (
 	get_commission_balance_by_driver,
 )
-
-_songa_webhook_logger = None
-
-
-def get_songa_webhook_logger():
-	"""Return a shared Songa webhook logger for this module."""
-	global _songa_webhook_logger
-	if _songa_webhook_logger is None:
-		frappe.utils.logger.set_log_level("INFO")
-		_songa_webhook_logger = frappe.logger("songa_webhook_log", allow_site=True, file_count=20)
-	return _songa_webhook_logger
 
 
 def clean_comment(html):
@@ -39,15 +28,6 @@ def on_comment_update(doc, method):
 	if doc.comment_type == "Comment" and doc.reference_doctype == "Asset Repair" and doc.published == 0:
 		try:
 			clean_content = clean_comment(doc.content)
-			url = frappe.get_single("Songa Customization Settings").songa_webhook_endpoint
-
-			if not url:
-				frappe.log_error(
-					"Songa webhook endpoint not found, please check Songa Customization Settings",
-					"Asset Repair Comment",
-				)
-				return
-
 			asset_repair_id = (
 				frappe.db.get_value("Asset Repair", doc.reference_name, "custom_asset_repair_id")
 				or doc.reference_name
@@ -62,20 +42,8 @@ def on_comment_update(doc, method):
 				"comment_timestamp": doc.creation,
 			}
 
-			data = json.dumps(payload)
-			headers = {"Content-Type": "application/json"}
-			response = requests.post(url, data=data, headers=headers, verify=True)
-
-			if response.status_code != 200:
-				frappe.log_error(
-					f"Failed to send comment to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
-					"Asset Repair Comment",
-				)
+			if not send_songa_webhook(payload, context="Asset Repair Comment"):
 				return
-
-			get_songa_webhook_logger().info(
-				f"New comment on {doc.reference_doctype} - {doc.reference_name} by {doc.owner}. Content: {clean_content}\n"
-			)
 
 			frappe.db.savepoint("comment_published_update")
 			try:
@@ -102,69 +70,37 @@ def on_asset_repair_update(doc, method):
 		return
 
 	if doc.workflow_state == "Completed" and doc.workflow_state != doc.get_doc_before_save().workflow_state:
-		try:
-			url = frappe.get_single("Songa Customization Settings").songa_webhook_endpoint
+		payload = {
+			"action_type": ("Service Completed" if doc.repair_status == "Completed" else "Service Cancelled"),
+			"asset_repair_id": doc.custom_asset_repair_id,
+			"asset": doc.asset,
+			"asset_name": doc.asset_name,
+			"asset_type": doc.custom_asset_type,
+			"severity_type": doc.custom_severity_type,
+			"failure_date": str(doc.failure_date) if doc.failure_date else None,
+			"completion_date": (str(doc.completion_date) if doc.completion_date else None),
+			"repair_status": doc.repair_status,
+			"workflow_state": doc.workflow_state,
+			"stock_consumption": doc.stock_consumption,
+			"total_repair_cost": doc.total_repair_cost,
+			"description": doc.description,
+			"actions_performed": doc.actions_performed,
+		}
 
-			if not url:
-				frappe.log_error(
-					"Songa webhook endpoint not found, please check Songa Customization Settings",
-					"Asset Repair Completion",
-				)
-				return
+		if doc.stock_consumption:
+			payload["stock_items"] = [
+				{
+					"item_code": item.item_code,
+					"warehouse": item.warehouse,
+					"valuation_rate": item.valuation_rate,
+					"uom": item.custom_uom,
+					"consumed_quantity": item.consumed_quantity,
+					"total_value": item.total_value,
+				}
+				for item in doc.stock_items
+			]
 
-			payload = {
-				"action_type": (
-					"Service Completed" if doc.repair_status == "Completed" else "Service Cancelled"
-				),
-				"asset_repair_id": doc.custom_asset_repair_id,
-				"asset": doc.asset,
-				"asset_name": doc.asset_name,
-				"asset_type": doc.custom_asset_type,
-				"severity_type": doc.custom_severity_type,
-				"failure_date": str(doc.failure_date) if doc.failure_date else None,
-				"completion_date": (str(doc.completion_date) if doc.completion_date else None),
-				"repair_status": doc.repair_status,
-				"workflow_state": doc.workflow_state,
-				"stock_consumption": doc.stock_consumption,
-				"total_repair_cost": doc.total_repair_cost,
-				"description": doc.description,
-				"actions_performed": doc.actions_performed,
-			}
-
-			if doc.stock_consumption:
-				payload["stock_items"] = [
-					{
-						"item_code": item.item_code,
-						"warehouse": item.warehouse,
-						"valuation_rate": item.valuation_rate,
-						"uom": item.custom_uom,
-						"consumed_quantity": item.consumed_quantity,
-						"total_value": item.total_value,
-					}
-					for item in doc.stock_items
-				]
-
-			data = json.dumps(payload)
-			headers = {"Content-Type": "application/json"}
-			response = requests.post(url, data=data, headers=headers, verify=True)
-
-			if response.status_code != 200:
-				frappe.log_error(
-					title="Asset Repair Completion",
-					message=f"Failed to send asset repair completion to Songa webhook. Status code: {response.status_code}, Response: {response.text}\n Payload: {payload}",
-				)
-				return
-
-			get_songa_webhook_logger().info(
-				f"Asset Repair Completed - {doc.name} for Asset {doc.asset}. Sent completion event to Songa. Payload: {payload}"
-			)
-
-		except Exception as e:
-			frappe.log_error(
-				title="Asset Repair Completion",
-				message=f"Error processing asset repair completion for {doc.name}: {e!s}\nPayload: {payload}",
-			)
-			raise
+		send_songa_webhook(payload, context="Asset Repair Completion")
 
 
 def on_driver_insert(doc, method):
@@ -174,7 +110,7 @@ def on_driver_insert(doc, method):
 			"Driver Insert",
 		)
 		frappe.msgprint(
-			f"Driver {doc.name} is missing Supplier Group. Cannot create linked Supplier/Customer.",
+			_(f"Driver {doc.name} is missing Supplier Group. Cannot create linked Supplier/Customer."),
 			alert=True,
 		)
 		return
@@ -238,117 +174,44 @@ def on_driver_insert(doc, method):
 		frappe.throw("Failed to create linked Supplier/Customer. Please try again.")
 
 
-# TODO: Revisit this, should send driver commission cash payments to songa platform on submit.
 def on_payment_entry_submit(doc, method):
-	if doc.payment_type == "Pay" and doc.party_type == "Supplier" and doc.party:
-		driver_id = frappe.db.get_value("Driver", {"transporter": doc.party}, "name")
-		if driver_id:
-			commission_balance = get_commission_balance_by_driver(driver_id)
-			if commission_balance["status"] == "error":
-				frappe.throw(f"Error fetching commission balance: {commission_balance['message']}")
-			else:
-				try:
-					url = frappe.get_single("Songa Customization Settings").songa_webhook_endpoint
-
-					if not url:
-						frappe.log_error(
-							title="Payment Entry Submission",
-							message="Songa webhook endpoint not found, please check Songa Customization Settings",
-						)
-						return
-
-					payload = {
-						"action_type": "Commission Deduction",
-						"driver_id": driver_id,
-						"payment_entry": doc.name,
-						"amount": doc.paid_amount,
-						"commission_balance": commission_balance.get("balance"),
-					}
-					data = json.dumps(payload)
-					headers = {"Content-Type": "application/json"}
-					response = requests.post(url, data=data, headers=headers, verify=True)
-
-					if response.status_code != 200:
-						frappe.log_error(
-							title="Payment Entry Submission",
-							message=f"Failed to send commission deduction to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
-						)
-						return
-
-					get_songa_webhook_logger().info(
-						f"Payment Entry Submitted - {doc.name} for Driver {driver_id}. Sent commission deduction event to Songa."
-					)
-				except Exception as e:
-					frappe.log_error(
-						title="Payment Entry Submission",
-						message=f"Error fetching Songa webhook endpoint: {e!s}",
-					)
-					return
-
-
-# TODO: optimize this to update songa platform on lease payment submission
-def on_journal_entry_submit(doc, method):
-	if not doc.is_system_generated or doc.voucher_type != "Journal Entry":
+	if not (doc.payment_type == "Pay" and doc.party_type == "Supplier" and doc.party):
 		return
 
-	customer_credits = [
-		entry for entry in doc.accounts if entry.party_type == "Customer" and entry.credit > 0
-	]
-
-	supplier_debits = [entry for entry in doc.accounts if entry.party_type == "Supplier" and entry.debit > 0]
-
-	unique_customers = set(entry.party for entry in customer_credits)
-	unique_suppliers = set(entry.party for entry in supplier_debits)
-
-	if len(unique_customers) != 1 or len(unique_suppliers) != 1:
-		return
-
-	supplier = frappe.get_doc("Supplier", supplier_debits[0].party)
-
-	driver_id = frappe.db.get_value("Driver", {"transporter": supplier.name}, "name")
+	driver_id = frappe.db.get_value("Driver", {"transporter": doc.party}, "name")
 	if not driver_id:
 		return
 
 	commission_balance = get_commission_balance_by_driver(driver_id)
 	if commission_balance["status"] == "error":
-		frappe.throw(f"Error fetching commission balance: {commission_balance['message']}")
-	else:
-		try:
-			url = frappe.get_single("Songa Customization Settings").songa_webhook_endpoint
-			if not url:
-				frappe.log_error(
-					title="Journal Entry Submission",
-					message="Songa webhook endpoint not found, please check Songa Customization Settings",
-				)
-				return
+		frappe.log_error(
+			title="Payment Entry Submission",
+			message=f"Error fetching commission balance for driver {driver_id}: "
+			f"{commission_balance['message']}",
+		)
+		return
 
-			payload = {
-				"action_type": "Commission Deduction",
-				"driver_id": driver_id,
-				"journal_entry": doc.name,
-				"amount": doc.total_debit,
-				"commission_balance": commission_balance.get("balance"),
-			}
-			data = json.dumps(payload)
-			headers = {"Content-Type": "application/json"}
+	_send_commission_deduction_event(doc, driver_id, commission_balance)
 
-			response = requests.post(url, data=data, headers=headers, verify=True)
-			if response.status_code != 200:
-				frappe.log_error(
-					title="Journal Entry Submission",
-					message="Failed to send commission deduction to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
-				)
-				return
 
-			get_songa_webhook_logger().info(
-				f"Journal Entry Submitted - {doc.name} for Driver {driver_id}. Sent commission deduction event to Songa."
-			)
-		except Exception:
-			frappe.log_error(
-				title="Journal Entry Submission",
-				message="Error fetching Songa webhook endpoint: {e!s}",
-			)
-			return
+def on_journal_entry_submit(doc, method):
+	if not is_lease_payment_je(doc):
+		return
+
+	driver_id = _get_lease_payment_driver(doc)
+	if not driver_id:
+		return
+
+	commission_balance = get_commission_balance_by_driver(driver_id)
+	if commission_balance["status"] == "error":
+		frappe.log_error(
+			title="Journal Entry Submission",
+			message=f"Error fetching commission balance for driver {driver_id}: "
+			f"{commission_balance['message']}",
+		)
+		return
+
+	_send_commission_deduction_event(doc, driver_id, commission_balance)
 
 
 def on_purchase_invoice_validate(doc, method):
@@ -400,3 +263,93 @@ def on_stock_entry_validate(doc, method):
 
 	for item in doc.items:
 		item.expense_account = expense_account
+
+
+def _send_commission_deduction_event(doc, driver_id, commission_balance):
+	payload = {
+		"action_type": "Commission Deduction",
+		"driver_id": driver_id,
+		"commission_balance": commission_balance.get("balance"),
+	}
+
+	if doc.doctype == "Payment Entry":
+		payload["payment_entry"] = doc.name
+		payload["amount"] = doc.paid_amount
+	elif doc.doctype == "Journal Entry":
+		payload["journal_entry"] = doc.name
+		payload["amount"] = doc.total_debit
+	else:
+		frappe.log_error(
+			title="Commission Deduction Webhook",
+			message=f"Unsupported doctype for commission deduction webhook: {doc.doctype}",
+		)
+		return
+
+	send_songa_webhook(payload, context="Commission Deduction Webhook")
+
+
+def _get_lease_payment_settings():
+	settings = frappe.get_single("Songa Customization Settings")
+	debit_account = settings.lease_payment_debit
+	credit_account = settings.lease_payment_credit
+	cost_center = settings.lease_payment_cost_center
+	if not (debit_account and credit_account and cost_center):
+		return None
+	return {
+		"debit_account": debit_account,
+		"credit_account": credit_account,
+		"cost_center": cost_center,
+	}
+
+
+def _get_lease_payment_debit_rows(doc, debit_account):
+	if not getattr(doc, "accounts", None):
+		return []
+
+	return [
+		row
+		for row in doc.accounts
+		if (
+			row.account == debit_account
+			and row.party_type == "Supplier"
+			and row.party
+			and (row.debit or 0) > 0
+		)
+	]
+
+
+def _get_lease_payment_driver(doc, debit_account=None):
+	"""Return the Active Driver linked to a lease-payment debit Supplier party."""
+	if not debit_account:
+		lease_settings = _get_lease_payment_settings()
+		if not lease_settings:
+			return None
+		debit_account = lease_settings["debit_account"]
+
+	for row in _get_lease_payment_debit_rows(doc, debit_account):
+		driver_id = frappe.db.get_value("Driver", {"transporter": row.party, "status": "Active"}, "name")
+		if driver_id:
+			return driver_id
+	return None
+
+
+def is_lease_payment_je(doc):
+	"""Return True if the Journal Entry is a lease payment against an active driver."""
+	lease_settings = _get_lease_payment_settings()
+	if not lease_settings:
+		return False
+
+	debit_rows = _get_lease_payment_debit_rows(doc, lease_settings["debit_account"])
+	if not debit_rows:
+		return False
+
+	has_lease_credit = any(
+		row.account == lease_settings["credit_account"]
+		and row.cost_center == lease_settings["cost_center"]
+		and (row.credit or 0) > 0
+		for row in doc.accounts
+	)
+	if not has_lease_credit:
+		return False
+
+	return bool(_get_lease_payment_driver(doc, lease_settings["debit_account"]))

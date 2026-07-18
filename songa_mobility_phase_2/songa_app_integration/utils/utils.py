@@ -1,7 +1,6 @@
 import json
 
 import frappe
-import requests
 from erpnext.accounts.party import get_party_account
 
 from songa_mobility_phase_2.songa_app_integration.report_helpers import (
@@ -9,6 +8,7 @@ from songa_mobility_phase_2.songa_app_integration.report_helpers import (
 	get_energy_kwh_balance,
 	get_rental_days_balance,
 )
+from songa_mobility_phase_2.songa_app_integration.utils.songa_webhook import send_songa_webhook
 
 
 def get_driver_commission_account():
@@ -537,46 +537,28 @@ def process_mpesa_express_request(doc):
 			frappe.db.rollback(save_point="mpesa_express_request")
 			raise
 
-		url = frappe.get_single("Songa Customization Settings").songa_webhook_endpoint
-
-		if not url:
-			frappe.log_error(
-				"Songa webhook endpoint not found, please check Songa Customization Settings",
-				"Commission Ledger Workflow",
-			)
-			return
-
-		# initiate logger
-		frappe.utils.logger.set_log_level("INFO")
-		songa_webhook_logger = frappe.logger("songa_webhook_log", allow_site=True, file_count=20)
-
-		return_payload = {
+		payload = {
 			"driver_id": reference_doc.driver,
 			"transaction_type": reference_doc.transaction_type,
 			"amount": reference_doc.amount,
 			"mpesa_express_request": doc.name,
 		}
 
-		headers = {"Content-Type": "application/json"}
-
 		if doc.status == "Completed":
 			if reference_doctype == "Rental Days":
-				return_payload["action_type"] = "Rental days recharge"
-				return_payload["rental_days_balance"] = get_rental_days_balance_by_driver(
+				payload["action_type"] = "Rental days recharge"
+				payload["rental_days_balance"] = get_rental_days_balance_by_driver(
 					driver_id=reference_doc.driver
 				)
 			elif reference_doctype == "Energy KWh":
-				return_payload["action_type"] = "Energy recharge"
-				return_payload["energy_kwh_balance"] = get_energy_kwh_balance_by_driver(
+				payload["action_type"] = "Energy recharge"
+				payload["energy_kwh_balance"] = get_energy_kwh_balance_by_driver(
 					driver_id=reference_doc.driver
 				)
-
-			data = json.dumps(return_payload)
-			response = requests.post(url, data=data, headers=headers, verify=True)
-			if response.status_code != 200:
-				frappe.log_error(f"{response}", "Error sending data to webhook endpoint")
+			else:
 				return
-			songa_webhook_logger.info(f"Mpesa Express Request: {doc.name}. Response: {response}\n")
+
+			send_songa_webhook(payload, context="Mpesa Express Request")
 		else:
 			frappe.logger().info(
 				f"{reference_doctype} recharge cancelled for driver {reference_doc.driver} "
