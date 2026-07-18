@@ -28,6 +28,13 @@
   "rental_recharge_mpesa_debit",
   "column_break_plqj",
   "rental_recharge_mpesa_credit",
+  "lease_payment_tab",
+  "lease_payment_accounts_section",
+  "lease_payment_debit",
+  "column_break_lease",
+  "lease_payment_credit",
+  "section_break_lease_cc",
+  "lease_payment_cost_center",
   "asset_repair_tab",
   "stock_expense_accounts_section",
   "lease_to_own",
@@ -192,13 +199,52 @@
    "label": "Credit Account",
    "options": "Account",
    "reqd": 1
+  },
+  {
+   "fieldname": "lease_payment_tab",
+   "fieldtype": "Tab Break",
+   "label": "Lease Payment"
+  },
+  {
+   "fieldname": "lease_payment_accounts_section",
+   "fieldtype": "Section Break",
+   "label": "Accounts"
+  },
+  {
+   "fieldname": "lease_payment_debit",
+   "fieldtype": "Link",
+   "label": "Debit Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_lease",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "lease_payment_credit",
+   "fieldtype": "Link",
+   "label": "Credit Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_lease_cc",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "lease_payment_cost_center",
+   "fieldtype": "Link",
+   "label": "Cost Center",
+   "options": "Cost Center",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-07-12 20:24:19.889380",
+ "modified": "2026-07-18 17:45:00.000000",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Songa Customization Settings",
