@@ -27,9 +27,7 @@ def get_songa_inbound_requests_logger():
 
 
 def _log_inbound_request(endpoint, payload):
-	get_songa_inbound_requests_logger().info(
-		f"Endpoint: {endpoint} | Payload: {payload}"
-	)
+	get_songa_inbound_requests_logger().info(f"Endpoint: {endpoint} | Payload: {payload}")
 
 
 def check_for_empty_payload():
@@ -102,11 +100,17 @@ def _complete_commission_deduction(ledger_name, rental_days_name=None, energy_kw
 
 RECHARGE_ACCOUNT_FIELDS = {
 	"battery_swap": {
-		"commission": ("battery_swap_commission_debit", "battery_swap_commission_credit"),
+		"commission": (
+			"battery_swap_commission_debit",
+			"battery_swap_commission_credit",
+		),
 		"mpesa": ("battery_swap_mpesa_debit", "battery_swap_mpesa_credit"),
 	},
 	"rental_recharge": {
-		"commission": ("rental_recharge_commission_debit", "rental_recharge_commission_credit"),
+		"commission": (
+			"rental_recharge_commission_debit",
+			"rental_recharge_commission_credit",
+		),
 		"mpesa": ("rental_recharge_mpesa_debit", "rental_recharge_mpesa_credit"),
 	},
 }
@@ -128,8 +132,7 @@ def _validate_recharge_account_settings(product, payment_method):
 	return {
 		"status": "error",
 		"message": (
-			"Please set the following accounts on Songa Customization Settings: "
-			+ ", ".join(labels)
+			"Please set the following accounts on Songa Customization Settings: " + ", ".join(labels)
 		),
 	}
 
@@ -215,7 +218,10 @@ def recharge_rental_days():
 
 		if payment_method not in ("commission", "mpesa"):
 			frappe.local.response["http_status_code"] = 400
-			return {"status": "error", "message": "Invalid payment method. Must be 'commission' or 'mpesa'"}
+			return {
+				"status": "error",
+				"message": "Invalid payment method. Must be 'commission' or 'mpesa'",
+			}
 
 		account_settings_error = _validate_recharge_account_settings("rental_recharge", payment_method)
 		if account_settings_error:
@@ -241,7 +247,10 @@ def recharge_rental_days():
 				raise ValueError
 		except (TypeError, ValueError):
 			frappe.local.response["http_status_code"] = 400
-			return {"status": "error", "message": "A valid positive number of days is required"}
+			return {
+				"status": "error",
+				"message": "A valid positive number of days is required",
+			}
 
 		if payment_method == "commission":
 			# Lock the driver's commission ledger rows to prevent race conditions
@@ -257,7 +266,10 @@ def recharge_rental_days():
 
 			if amount > commission_balance["balance"]:
 				frappe.local.response["http_status_code"] = 400
-				return {"status": "error", "message": "Amount exceeds commission balance"}
+				return {
+					"status": "error",
+					"message": "Amount exceeds commission balance",
+				}
 
 		elif payment_method == "mpesa":
 			if not validate_phone_number(phone_number):
@@ -329,7 +341,10 @@ def recharge_rental_days():
 				mpesa_express_request.submit()
 
 				frappe.set_value(
-					"Rental Days", rental_days.name, "mpesa_express_request", mpesa_express_request.name
+					"Rental Days",
+					rental_days.name,
+					"mpesa_express_request",
+					mpesa_express_request.name,
 				)
 
 			frappe.db.commit()
@@ -384,7 +399,10 @@ def recharge_kwh():
 
 		if payment_method not in ("commission", "mpesa"):
 			frappe.local.response["http_status_code"] = 400
-			return {"status": "error", "message": "Invalid payment method. Must be 'commission' or 'mpesa'"}
+			return {
+				"status": "error",
+				"message": "Invalid payment method. Must be 'commission' or 'mpesa'",
+			}
 
 		account_settings_error = _validate_recharge_account_settings("battery_swap", payment_method)
 		if account_settings_error:
@@ -410,7 +428,10 @@ def recharge_kwh():
 				raise ValueError
 		except (TypeError, ValueError):
 			frappe.local.response["http_status_code"] = 400
-			return {"status": "error", "message": "A valid positive kWh value is required"}
+			return {
+				"status": "error",
+				"message": "A valid positive kWh value is required",
+			}
 
 		if payment_method == "commission":
 			# Lock the driver's commission ledger rows to prevent race conditions
@@ -426,7 +447,10 @@ def recharge_kwh():
 
 			if amount > commission_balance["balance"]:
 				frappe.local.response["http_status_code"] = 400
-				return {"status": "error", "message": "Amount exceeds commission balance"}
+				return {
+					"status": "error",
+					"message": "Amount exceeds commission balance",
+				}
 
 		elif payment_method == "mpesa":
 			if not validate_phone_number(phone_number):
@@ -496,7 +520,10 @@ def recharge_kwh():
 				mpesa_express_request.submit()
 
 				frappe.set_value(
-					"Energy KWh", energy_kwh.name, "mpesa_express_request", mpesa_express_request.name
+					"Energy KWh",
+					energy_kwh.name,
+					"mpesa_express_request",
+					mpesa_express_request.name,
 				)
 
 			frappe.db.commit()
@@ -550,7 +577,10 @@ def consume_rental_days():
 				raise ValueError
 		except (TypeError, ValueError):
 			frappe.local.response["http_status_code"] = 400
-			return {"status": "error", "message": "A valid positive number of days is required"}
+			return {
+				"status": "error",
+				"message": "A valid positive number of days is required",
+			}
 
 		frappe.db.sql(
 			"SELECT name FROM `tabRental Days` WHERE driver = %s FOR UPDATE",
@@ -625,7 +655,10 @@ def consume_kwh():
 				raise ValueError
 		except (TypeError, ValueError):
 			frappe.local.response["http_status_code"] = 400
-			return {"status": "error", "message": "A valid positive kWh value is required"}
+			return {
+				"status": "error",
+				"message": "A valid positive kWh value is required",
+			}
 
 		frappe.db.sql(
 			"SELECT name FROM `tabEnergy KWh` WHERE driver = %s FOR UPDATE",
@@ -687,7 +720,10 @@ def _cancel_document(doctype, document_id, id_field):
 
 	if doc.docstatus == 2:
 		frappe.local.response["http_status_code"] = 200
-		return {"status": "success", "message": f"{doctype} is already cancelled. ID: {document_id}"}
+		return {
+			"status": "success",
+			"message": f"{doctype} is already cancelled. ID: {document_id}",
+		}
 
 	savepoint = f"cancel_{id_field}"
 	frappe.db.savepoint(savepoint)
@@ -722,7 +758,10 @@ def _cancel_document(doctype, document_id, id_field):
 
 	frappe.db.commit()
 
-	return {"status": "success", "message": f"{doctype} cancelled successfully. ID: {document_id}"}
+	return {
+		"status": "success",
+		"message": f"{doctype} cancelled successfully. ID: {document_id}",
+	}
 
 
 @frappe.whitelist(allow_guest=False)
@@ -739,7 +778,10 @@ def cancel_rental_days():
 
 	except frappe.PermissionError:
 		frappe.local.response["http_status_code"] = 403
-		return {"status": "error", "message": "You do not have permission to cancel this record"}
+		return {
+			"status": "error",
+			"message": "You do not have permission to cancel this record",
+		}
 	except Exception as e:
 		frappe.db.rollback()
 		frappe.local.response["http_status_code"] = 500
@@ -760,7 +802,10 @@ def cancel_energy_kwh():
 
 	except frappe.PermissionError:
 		frappe.local.response["http_status_code"] = 403
-		return {"status": "error", "message": "You do not have permission to cancel this record"}
+		return {
+			"status": "error",
+			"message": "You do not have permission to cancel this record",
+		}
 	except Exception as e:
 		frappe.db.rollback()
 		frappe.local.response["http_status_code"] = 500
@@ -769,81 +814,92 @@ def cancel_energy_kwh():
 
 @frappe.whitelist(allow_guest=False)
 def create_asset_repair():
-    try:
-        data = check_for_empty_payload()
-        if isinstance(data, dict) and data.get("status") == "error":
-            return data
+	try:
+		data = check_for_empty_payload()
+		if isinstance(data, dict) and data.get("status") == "error":
+			return data
 
-        check_for_empty_values(data, ["asset_repair_id", "failure_date", "description", "asset_id", "asset_type_id", "user_email", "severity_type_id"])
+		check_for_empty_values(
+			data,
+			[
+				"asset_repair_id",
+				"failure_date",
+				"description",
+				"asset_id",
+				"asset_type_id",
+				"user_email",
+				"severity_type_id",
+			],
+		)
 
-        asset_repair_id = data.get("asset_repair_id")
-        user_email = data.get("user_email")
-        description = data.get("description")
-        asset_id = data.get("asset_id")
-        asset_type_id = data.get("asset_type_id")
-        severity_type_id = data.get("severity_type_id")
-        failure_date = data.get("failure_date")
-        company = data.get("company")
+		asset_repair_id = data.get("asset_repair_id")
+		user_email = data.get("user_email")
+		description = data.get("description")
+		asset_id = data.get("asset_id")
+		asset_type_id = data.get("asset_type_id")
+		severity_type_id = data.get("severity_type_id")
+		failure_date = data.get("failure_date")
+		company = data.get("company")
 
-        if not frappe.db.exists("User", user_email):
-            frappe.local.response["http_status_code"] = 404
-            return {"status": "error", "message": "User not found"}
+		if not frappe.db.exists("User", user_email):
+			frappe.local.response["http_status_code"] = 404
+			return {"status": "error", "message": "User not found"}
 
-        if frappe.db.exists("Asset Repair", {"custom_asset_repair_id": asset_repair_id}):
-            frappe.local.response["http_status_code"] = 200
-            return {
-                "status": "success",
-                "message": "Duplicate Asset Repair",
-                "asset_repair_id": asset_repair_id,
-            }
+		if frappe.db.exists("Asset Repair", {"custom_asset_repair_id": asset_repair_id}):
+			frappe.local.response["http_status_code"] = 200
+			return {
+				"status": "success",
+				"message": "Duplicate Asset Repair",
+				"asset_repair_id": asset_repair_id,
+			}
 
-        savepoint = "create_asset_repair"
-        frappe.db.savepoint(savepoint)
+		savepoint = "create_asset_repair"
+		frappe.db.savepoint(savepoint)
 
-        asset_type = frappe.db.get_value("Asset Type", asset_type_id, "name")
-        if not asset_type:
-            frappe.local.response["http_status_code"] = 404
-            return {"status": "error", "message": "Asset Type not found"}
+		asset_type = frappe.db.get_value("Asset Type", asset_type_id, "name")
+		if not asset_type:
+			frappe.local.response["http_status_code"] = 404
+			return {"status": "error", "message": "Asset Type not found"}
 
-        severity_type = frappe.db.get_value("Severity Type", severity_type_id, "name")
-        if not severity_type:
-            frappe.local.response["http_status_code"] = 404
-            return {"status": "error", "message": "Severity Type not found"}
+		severity_type = frappe.db.get_value("Severity Type", severity_type_id, "name")
+		if not severity_type:
+			frappe.local.response["http_status_code"] = 404
+			return {"status": "error", "message": "Severity Type not found"}
 
-        try:
-            # setting the user_email here, so its easy to identify who created the asset repair and will need updates
-            frappe.set_user(user_email)
+		try:
+			# setting the user_email here, so its easy to identify who created the asset repair and will need updates
+			frappe.set_user(user_email)
 
-            asset_repair = frappe.new_doc("Asset Repair")
-            asset_repair.company = company or frappe.defaults.get_user_default("company")
-            asset_repair.custom_asset_repair_id = asset_repair_id
-            asset_repair.custom_severity_type_id = severity_type_id
-            asset_repair.asset = asset_id
-            asset_repair.custom_asset_type_id = asset_type_id
-            asset_repair.description = description
-            asset_repair.failure_date = frappe.utils.get_datetime(failure_date)
-            asset_repair.insert(ignore_permissions=True)
+			asset_repair = frappe.new_doc("Asset Repair")
+			asset_repair.company = company or frappe.defaults.get_user_default("company")
+			asset_repair.custom_asset_repair_id = asset_repair_id
+			asset_repair.custom_severity_type_id = severity_type_id
+			asset_repair.asset = asset_id
+			asset_repair.custom_asset_type_id = asset_type_id
+			asset_repair.description = description
+			asset_repair.failure_date = frappe.utils.get_datetime(failure_date)
+			asset_repair.insert(ignore_permissions=True)
 
-            apply_workflow(asset_repair, "Submit For Approval - Technical Agent")
+			apply_workflow(asset_repair, "Submit For Approval - Technical Agent")
 
-            frappe.db.commit()
+			frappe.db.commit()
 
-            return {
-                "status": "success",
-                "message": "Asset Repair created successfully.",
-                "asset_repair_id": asset_repair.custom_asset_repair_id,
-            }
+			return {
+				"status": "success",
+				"message": "Asset Repair created successfully.",
+				"asset_repair_id": asset_repair.custom_asset_repair_id,
+			}
 
-        except Exception:
-            frappe.db.rollback(save_point=savepoint)
-            raise
+		except Exception:
+			frappe.db.rollback(save_point=savepoint)
+			raise
 
-    except Exception as e:
-        frappe.local.response["http_status_code"] = 500
-        return {"status": "error", "message": str(e)}
+	except Exception as e:
+		frappe.local.response["http_status_code"] = 500
+		return {"status": "error", "message": str(e)}
 
-    finally:
-        frappe.set_user("Administrator")
+	finally:
+		frappe.set_user("Administrator")
 
 
 @frappe.whitelist(allow_guest=False)
@@ -860,9 +916,12 @@ def check_asset_repair_status():
 
 		if not frappe.db.exists("Asset Repair", {"custom_asset_repair_id": asset_repair_id}):
 			frappe.local.response["http_status_code"] = 404
-			return {"status": "error", "message": f"Asset Repair not found. ID: {asset_repair_id}"}
+			return {
+				"status": "error",
+				"message": f"Asset Repair not found. ID: {asset_repair_id}",
+			}
 
-		asset_repair = frappe.get_doc("Asset Repair", { "custom_asset_repair_id": asset_repair_id })
+		asset_repair = frappe.get_doc("Asset Repair", {"custom_asset_repair_id": asset_repair_id})
 
 		message = {
 			"asset_repair_id": asset_repair.custom_asset_repair_id,
@@ -870,8 +929,8 @@ def check_asset_repair_status():
 			"asset_name": asset_repair.asset_name,
 			"asset_type": asset_repair.custom_asset_type,
 			"severity_type": asset_repair.custom_severity_type,
-			"failure_date": str(asset_repair.failure_date) if asset_repair.failure_date else None,
-			"completion_date": str(asset_repair.completion_date) if asset_repair.completion_date else None,
+			"failure_date": (str(asset_repair.failure_date) if asset_repair.failure_date else None),
+			"completion_date": (str(asset_repair.completion_date) if asset_repair.completion_date else None),
 			"repair_status": asset_repair.repair_status,
 			"workflow_state": asset_repair.workflow_state,
 			"stock_consumption": asset_repair.stock_consumption,
@@ -923,7 +982,9 @@ def comment_on_asset_repair():
 
 		frappe.set_user(user_email)
 
-		reference_name = frappe.db.get_value("Asset Repair", {"custom_asset_repair_id": asset_repair_id}, "name")
+		reference_name = frappe.db.get_value(
+			"Asset Repair", {"custom_asset_repair_id": asset_repair_id}, "name"
+		)
 
 		doc = frappe.get_doc(
 			{
@@ -944,114 +1005,117 @@ def comment_on_asset_repair():
 	finally:
 		frappe.set_user("Administrator")
 
+
 @frappe.whitelist(allow_guest=False)
 def update_asset_repair():
-    try:
-        data = check_for_empty_payload()
+	try:
+		data = check_for_empty_payload()
 
-        if isinstance(data, dict) and data.get("status") == "error":
-            return data
+		if isinstance(data, dict) and data.get("status") == "error":
+			return data
 
-        check_for_empty_values(data, ["asset_repair_id", "updated_values", "user_email"])
+		check_for_empty_values(data, ["asset_repair_id", "updated_values", "user_email"])
 
-        asset_repair_id = data.get("asset_repair_id")
-        updated_values = data.get("updated_values")
-        user_email = data.get("user_email")
+		asset_repair_id = data.get("asset_repair_id")
+		updated_values = data.get("updated_values")
+		user_email = data.get("user_email")
 
-        if not isinstance(updated_values, dict) or not updated_values:
-            frappe.local.response["http_status_code"] = 400
-            return {"status": "error", "message": "updated_values must be a non-empty object"}
+		if not isinstance(updated_values, dict) or not updated_values:
+			frappe.local.response["http_status_code"] = 400
+			return {
+				"status": "error",
+				"message": "updated_values must be a non-empty object",
+			}
 
-        if not frappe.db.exists("User", user_email):
-            frappe.local.response["http_status_code"] = 404
-            return {"status": "error", "message": "User not found"}
+		if not frappe.db.exists("User", user_email):
+			frappe.local.response["http_status_code"] = 404
+			return {"status": "error", "message": "User not found"}
 
-        if not frappe.db.exists("Asset Repair", {"custom_asset_repair_id": asset_repair_id}):
-            frappe.local.response["http_status_code"] = 404
-            return {"status": "error", "message": f"Asset Repair not found. ID: {asset_repair_id}"}
+		if not frappe.db.exists("Asset Repair", {"custom_asset_repair_id": asset_repair_id}):
+			frappe.local.response["http_status_code"] = 404
+			return {
+				"status": "error",
+				"message": f"Asset Repair not found. ID: {asset_repair_id}",
+			}
 
-        repair_name = frappe.db.get_value(
-            "Asset Repair", {"custom_asset_repair_id": asset_repair_id}, "name"
-        )
+		repair_name = frappe.db.get_value("Asset Repair", {"custom_asset_repair_id": asset_repair_id}, "name")
 
-        allowed_fields = {
-            "severity_type_id": {
-                "fieldname": "custom_severity_type_id",
-                "validate": lambda v: frappe.db.get_value("Severity Type", v, "name"),
-                "error": "Severity Type not found",
-                "companion": {
-                    "doctype": "Severity Type",
-                    "fetch_field": "severity_type",
-                    "fieldname": "custom_severity_type",
-                },
-            },
-            "asset_type_id": {
-                "fieldname": "custom_asset_type_id",
-                "validate": lambda v: frappe.db.get_value("Asset Type", v, "name"),
-                "error": "Asset Type not found",
-                "companion": {
-                    "doctype": "Asset Type",
-                    "fetch_field": "asset_type",
-                    "fieldname": "custom_asset_type",
-                },
-            },
-            "description": {
-                "fieldname": "description",
-            },
-            "failure_date": {
-                "fieldname": "failure_date",
-                "coerce": lambda v: frappe.utils.getdate(v),
-            },
-        }
+		allowed_fields = {
+			"severity_type_id": {
+				"fieldname": "custom_severity_type_id",
+				"validate": lambda v: frappe.db.get_value("Severity Type", v, "name"),
+				"error": "Severity Type not found",
+				"companion": {
+					"doctype": "Severity Type",
+					"fetch_field": "severity_type",
+					"fieldname": "custom_severity_type",
+				},
+			},
+			"asset_type_id": {
+				"fieldname": "custom_asset_type_id",
+				"validate": lambda v: frappe.db.get_value("Asset Type", v, "name"),
+				"error": "Asset Type not found",
+				"companion": {
+					"doctype": "Asset Type",
+					"fetch_field": "asset_type",
+					"fieldname": "custom_asset_type",
+				},
+			},
+			"description": {
+				"fieldname": "description",
+			},
+			"failure_date": {
+				"fieldname": "failure_date",
+				"coerce": lambda v: frappe.utils.getdate(v),
+			},
+		}
 
-        unrecognised = [k for k in updated_values if k not in allowed_fields]
-        if unrecognised:
-            frappe.local.response["http_status_code"] = 400
-            return {
-                "status": "error",
-                "message": f"Unrecognised field(s): {', '.join(unrecognised)}. "
-                           f"Allowed fields: {', '.join(allowed_fields)}",
-            }
+		unrecognised = [k for k in updated_values if k not in allowed_fields]
+		if unrecognised:
+			frappe.local.response["http_status_code"] = 400
+			return {
+				"status": "error",
+				"message": f"Unrecognised field(s): {', '.join(unrecognised)}. "
+				f"Allowed fields: {', '.join(allowed_fields)}",
+			}
 
-        fields_to_update = {}
+		fields_to_update = {}
 
-        frappe.set_user(user_email)
+		frappe.set_user(user_email)
 
-        for key, value in updated_values.items():
-            field_config = allowed_fields[key]
+		for key, value in updated_values.items():
+			field_config = allowed_fields[key]
 
-            if "validate" in field_config:
-                if not field_config["validate"](value):
-                    frappe.local.response["http_status_code"] = 404
-                    return {"status": "error", "message": field_config["error"]}
+			if "validate" in field_config:
+				if not field_config["validate"](value):
+					frappe.local.response["http_status_code"] = 404
+					return {"status": "error", "message": field_config["error"]}
 
-            if "coerce" in field_config:
-                value = field_config["coerce"](value)
+			if "coerce" in field_config:
+				value = field_config["coerce"](value)
 
-            fields_to_update[field_config["fieldname"]] = value
+			fields_to_update[field_config["fieldname"]] = value
 
-            # If this field has a companion, fetch and include its value too
-            if "companion" in field_config:
-                companion = field_config["companion"]
-                companion_value = frappe.db.get_value(
-                    companion["doctype"], value, companion["fetch_field"]
-                )
-                fields_to_update[companion["fieldname"]] = companion_value
+			# If this field has a companion, fetch and include its value too
+			if "companion" in field_config:
+				companion = field_config["companion"]
+				companion_value = frappe.db.get_value(companion["doctype"], value, companion["fetch_field"])
+				fields_to_update[companion["fieldname"]] = companion_value
 
-        frappe.db.set_value("Asset Repair", repair_name, fields_to_update)
-        frappe.db.commit()
+		frappe.db.set_value("Asset Repair", repair_name, fields_to_update)
+		frappe.db.commit()
 
-        return {
-            "status": "success",
-            "message": "Asset Repair updated successfully.",
-            "asset_repair_id": asset_repair_id,
-            "updated_fields": list(updated_values.keys()),
-        }
+		return {
+			"status": "success",
+			"message": "Asset Repair updated successfully.",
+			"asset_repair_id": asset_repair_id,
+			"updated_fields": list(updated_values.keys()),
+		}
 
-    except Exception as e:
-        frappe.db.rollback()
-        frappe.local.response["http_status_code"] = 500
-        return {"status": "error", "message": str(e)}
+	except Exception as e:
+		frappe.db.rollback()
+		frappe.local.response["http_status_code"] = 500
+		return {"status": "error", "message": str(e)}
 
-    finally:
-        frappe.set_user("Administrator")
+	finally:
+		frappe.set_user("Administrator")

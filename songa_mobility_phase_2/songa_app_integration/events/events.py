@@ -4,7 +4,9 @@ import re
 import frappe
 import requests
 
-from songa_mobility_phase_2.songa_app_integration.utils.utils import get_commission_balance_by_driver
+from songa_mobility_phase_2.songa_app_integration.utils.utils import (
+	get_commission_balance_by_driver,
+)
 
 _songa_webhook_logger = None
 
@@ -46,9 +48,10 @@ def on_comment_update(doc, method):
 				)
 				return
 
-			asset_repair_id = frappe.db.get_value(
-				"Asset Repair", doc.reference_name, "custom_asset_repair_id"
-			) or doc.reference_name
+			asset_repair_id = (
+				frappe.db.get_value("Asset Repair", doc.reference_name, "custom_asset_repair_id")
+				or doc.reference_name
+			)
 
 			payload = {
 				"action_type": "asset_repair_comment",
@@ -110,14 +113,16 @@ def on_asset_repair_update(doc, method):
 				return
 
 			payload = {
-				"action_type": "Service Completed" if doc.repair_status == "Completed" else "Service Cancelled",
+				"action_type": (
+					"Service Completed" if doc.repair_status == "Completed" else "Service Cancelled"
+				),
 				"asset_repair_id": doc.custom_asset_repair_id,
 				"asset": doc.asset,
 				"asset_name": doc.asset_name,
 				"asset_type": doc.custom_asset_type,
 				"severity_type": doc.custom_severity_type,
 				"failure_date": str(doc.failure_date) if doc.failure_date else None,
-				"completion_date": str(doc.completion_date) if doc.completion_date else None,
+				"completion_date": (str(doc.completion_date) if doc.completion_date else None),
 				"repair_status": doc.repair_status,
 				"workflow_state": doc.workflow_state,
 				"stock_consumption": doc.stock_consumption,
@@ -161,199 +166,202 @@ def on_asset_repair_update(doc, method):
 			)
 			raise
 
+
 def on_driver_insert(doc, method):
-    if not doc.custom_supplier_group:
-        frappe.log_error(
-            f"Driver {doc.name} is missing Supplier Group. Cannot create linked Supplier/Customer.",
-            "Driver Insert",
-        )
-        frappe.msgprint(
-            f"Driver {doc.name} is missing Supplier Group. Cannot create linked Supplier/Customer.",
-            alert=True,
-        )
-        return
+	if not doc.custom_supplier_group:
+		frappe.log_error(
+			f"Driver {doc.name} is missing Supplier Group. Cannot create linked Supplier/Customer.",
+			"Driver Insert",
+		)
+		frappe.msgprint(
+			f"Driver {doc.name} is missing Supplier Group. Cannot create linked Supplier/Customer.",
+			alert=True,
+		)
+		return
 
-    try:
-        if not (doc.transporter and doc.customer):
-            supplier = frappe.get_doc({
-                "doctype": "Supplier",
-                "supplier_name": doc.full_name,
-                "supplier_type": "Individual",
-                "supplier_group": doc.custom_supplier_group,
-            })
-            supplier.save(ignore_permissions=True)
+	try:
+		if not (doc.transporter and doc.customer):
+			supplier = frappe.get_doc(
+				{
+					"doctype": "Supplier",
+					"supplier_name": doc.full_name,
+					"supplier_type": "Individual",
+					"supplier_group": doc.custom_supplier_group,
+				}
+			)
+			supplier.save(ignore_permissions=True)
 
-            customer = frappe.get_doc({
-                "doctype": "Customer",
-                "customer_name": doc.full_name,
-                "customer_type": "Individual",
-            })
-            customer.save(ignore_permissions=True)
+			customer = frappe.get_doc(
+				{
+					"doctype": "Customer",
+					"customer_name": doc.full_name,
+					"customer_type": "Individual",
+				}
+			)
+			customer.save(ignore_permissions=True)
 
-            doc.transporter = supplier.name
-            doc.customer = customer.name
-            doc.save(ignore_permissions=True)
+			doc.transporter = supplier.name
+			doc.customer = customer.name
+			doc.save(ignore_permissions=True)
 
-        party_link_exists = (
-            frappe.db.exists("Party Link", {
-                "primary_role": "Supplier",
-                "primary_party": doc.transporter,
-                "secondary_role": "Customer",
-                "secondary_party": doc.customer,
-            })
-            or
-            frappe.db.exists("Party Link", {
-                "primary_role": "Customer",
-                "primary_party": doc.customer,
-                "secondary_role": "Supplier",
-                "secondary_party": doc.transporter,
-            })
-        )
-        if not party_link_exists:
-            frappe.get_doc({
-                "doctype": "Party Link",
-                "primary_role": "Supplier",
-                "primary_party": doc.transporter,
-                "secondary_role": "Customer",
-                "secondary_party": doc.customer,
-            }).save(ignore_permissions=True)
+		party_link_exists = frappe.db.exists(
+			"Party Link",
+			{
+				"primary_role": "Supplier",
+				"primary_party": doc.transporter,
+				"secondary_role": "Customer",
+				"secondary_party": doc.customer,
+			},
+		) or frappe.db.exists(
+			"Party Link",
+			{
+				"primary_role": "Customer",
+				"primary_party": doc.customer,
+				"secondary_role": "Supplier",
+				"secondary_party": doc.transporter,
+			},
+		)
+		if not party_link_exists:
+			frappe.get_doc(
+				{
+					"doctype": "Party Link",
+					"primary_role": "Supplier",
+					"primary_party": doc.transporter,
+					"secondary_role": "Customer",
+					"secondary_party": doc.customer,
+				}
+			).save(ignore_permissions=True)
 
-    except Exception:
-        frappe.db.rollback()
-        frappe.log_error(frappe.get_traceback(), "Driver Insert Failed")
-        frappe.throw("Failed to create linked Supplier/Customer. Please try again.")
+	except Exception:
+		frappe.db.rollback()
+		frappe.log_error(frappe.get_traceback(), "Driver Insert Failed")
+		frappe.throw("Failed to create linked Supplier/Customer. Please try again.")
 
+
+# TODO: Revisit this, should send driver commission cash payments to songa platform on submit.
 def on_payment_entry_submit(doc, method):
-	# TODO: Revisit this, optimize and refactor as needed. Send data to songa on submit, commented out currently.
-	if doc.payment_type == "Pay" and doc.party_type == "Supplier":
-		supplier_group = frappe.db.get_value("Supplier", doc.party, "supplier_group")
-		if supplier_group:
-			parent_supplier_group = frappe.db.get_value("Supplier Group", supplier_group, "parent_supplier_group")
-			if parent_supplier_group == "Drivers / Collectors":
-				driver_id = frappe.db.get_value("Driver", {"transporter": doc.party}, "name")
-				if driver_id:
-					commission_balance = get_commission_balance_by_driver(driver_id)
-					if commission_balance["status"] == "error":
-						frappe.throw(f"Error fetching commission balance: {commission_balance['message']}")
-					else:
-						try:
-							url = frappe.get_single("Songa Customization Settings").songa_webhook_endpoint
-
-							if not url:
-								frappe.log_error(
-									title="Payment Entry Submission",
-									message=f"Songa webhook endpoint not found, please check Songa Customization Settings",
-								)
-								return
-
-							payload = {
-								"action_type": "Commission Deduction",
-								"driver_id": driver_id,
-								"payment_entry": doc.name,
-								"amount": doc.paid_amount,
-								"commission_balance": commission_balance.get("balance"),
-							}
-							data = json.dumps(payload)
-							headers = {"Content-Type": "application/json"}
-							response = requests.post(url, data=data, headers=headers, verify=True)
-
-							if response.status_code != 200:
-								frappe.log_error(
-									title="Payment Entry Submission",
-									message=f"Failed to send commission deduction to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
-								)
-								return
-
-							get_songa_webhook_logger().info(
-								f"Payment Entry Submitted - {doc.name} for Driver {driver_id}. Sent commission deduction event to Songa."
-							)
-						except Exception as e:
-							frappe.log_error(
-								title="Payment Entry Submission",
-								message=f"Error fetching Songa webhook endpoint: {e!s}",
-							)
-							return
+	if doc.payment_type == "Pay" and doc.party_type == "Supplier" and doc.party:
+		driver_id = frappe.db.get_value("Driver", {"transporter": doc.party}, "name")
+		if driver_id:
+			commission_balance = get_commission_balance_by_driver(driver_id)
+			if commission_balance["status"] == "error":
+				frappe.throw(f"Error fetching commission balance: {commission_balance['message']}")
 			else:
+				try:
+					url = frappe.get_single("Songa Customization Settings").songa_webhook_endpoint
+
+					if not url:
+						frappe.log_error(
+							title="Payment Entry Submission",
+							message="Songa webhook endpoint not found, please check Songa Customization Settings",
+						)
+						return
+
+					payload = {
+						"action_type": "Commission Deduction",
+						"driver_id": driver_id,
+						"payment_entry": doc.name,
+						"amount": doc.paid_amount,
+						"commission_balance": commission_balance.get("balance"),
+					}
+					data = json.dumps(payload)
+					headers = {"Content-Type": "application/json"}
+					response = requests.post(url, data=data, headers=headers, verify=True)
+
+					if response.status_code != 200:
+						frappe.log_error(
+							title="Payment Entry Submission",
+							message=f"Failed to send commission deduction to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
+						)
+						return
+
+					get_songa_webhook_logger().info(
+						f"Payment Entry Submitted - {doc.name} for Driver {driver_id}. Sent commission deduction event to Songa."
+					)
+				except Exception as e:
+					frappe.log_error(
+						title="Payment Entry Submission",
+						message=f"Error fetching Songa webhook endpoint: {e!s}",
+					)
+					return
+
+
+# TODO: optimize this to update songa platform on lease payment submission
+def on_journal_entry_submit(doc, method):
+	if not doc.is_system_generated or doc.voucher_type != "Journal Entry":
+		return
+
+	customer_credits = [
+		entry for entry in doc.accounts if entry.party_type == "Customer" and entry.credit > 0
+	]
+
+	supplier_debits = [entry for entry in doc.accounts if entry.party_type == "Supplier" and entry.debit > 0]
+
+	unique_customers = set(entry.party for entry in customer_credits)
+	unique_suppliers = set(entry.party for entry in supplier_debits)
+
+	if len(unique_customers) != 1 or len(unique_suppliers) != 1:
+		return
+
+	supplier = frappe.get_doc("Supplier", supplier_debits[0].party)
+
+	driver_id = frappe.db.get_value("Driver", {"transporter": supplier.name}, "name")
+	if not driver_id:
+		return
+
+	commission_balance = get_commission_balance_by_driver(driver_id)
+	if commission_balance["status"] == "error":
+		frappe.throw(f"Error fetching commission balance: {commission_balance['message']}")
+	else:
+		try:
+			url = frappe.get_single("Songa Customization Settings").songa_webhook_endpoint
+			if not url:
+				frappe.log_error(
+					title="Journal Entry Submission",
+					message="Songa webhook endpoint not found, please check Songa Customization Settings",
+				)
 				return
-		else:
+
+			payload = {
+				"action_type": "Commission Deduction",
+				"driver_id": driver_id,
+				"journal_entry": doc.name,
+				"amount": doc.total_debit,
+				"commission_balance": commission_balance.get("balance"),
+			}
+			data = json.dumps(payload)
+			headers = {"Content-Type": "application/json"}
+
+			response = requests.post(url, data=data, headers=headers, verify=True)
+			if response.status_code != 200:
+				frappe.log_error(
+					title="Journal Entry Submission",
+					message="Failed to send commission deduction to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
+				)
+				return
+
+			get_songa_webhook_logger().info(
+				f"Journal Entry Submitted - {doc.name} for Driver {driver_id}. Sent commission deduction event to Songa."
+			)
+		except Exception:
+			frappe.log_error(
+				title="Journal Entry Submission",
+				message="Error fetching Songa webhook endpoint: {e!s}",
+			)
 			return
 
-def on_journal_entry_submit(doc, method):
-    if not doc.is_system_generated or doc.voucher_type != "Journal Entry":
-        return
 
-    customer_credits = [
-        entry for entry in doc.accounts
-        if entry.party_type == "Customer" and entry.credit > 0
-    ]
-
-    supplier_debits = [
-        entry for entry in doc.accounts
-        if entry.party_type == "Supplier" and entry.debit > 0
-    ]
-
-    unique_customers = set(entry.party for entry in customer_credits)
-    unique_suppliers = set(entry.party for entry in supplier_debits)
-
-    if len(unique_customers) != 1 or len(unique_suppliers) != 1:
-        return
-
-    supplier = frappe.get_doc("Supplier", supplier_debits[0].party)
-
-    driver_id = frappe.db.get_value("Driver", {"transporter": supplier.name}, "name")
-    if not driver_id:
-        return
-
-    commission_balance = get_commission_balance_by_driver(driver_id)
-    if commission_balance["status"] == "error":
-        frappe.throw(f"Error fetching commission balance: {commission_balance['message']}")
-    else:
-        try:
-            url = frappe.get_single("Songa Customization Settings").songa_webhook_endpoint
-            if not url:
-                frappe.log_error(
-					title="Journal Entry Submission",
-					message=f"Songa webhook endpoint not found, please check Songa Customization Settings",
-				)
-                return
-
-            payload = {
-                "action_type": "Commission Deduction",
-                "driver_id": driver_id,
-                "journal_entry": doc.name,
-                "amount": doc.total_debit,
-                "commission_balance": commission_balance.get("balance"),
-            }
-            data = json.dumps(payload)
-            headers = {"Content-Type": "application/json"}
-
-            response = requests.post(url, data=data, headers=headers, verify=True)
-            if response.status_code != 200:
-                frappe.log_error(
-					title="Journal Entry Submission",
-					message=f"Failed to send commission deduction to Songa webhook. Status code: {response.status_code}, Response: {response.text}",
-                )
-                return
-
-            get_songa_webhook_logger().info(
-                f"Journal Entry Submitted - {doc.name} for Driver {driver_id}. Sent commission deduction event to Songa."
-            )
-        except Exception as e:
-            frappe.log_error(
-				title="Journal Entry Submission",
-				message=f"Error fetching Songa webhook endpoint: {e!s}",
-			)
-            return
-		
 def on_purchase_invoice_validate(doc, method):
 	for item in doc.items:
-			item_branch = frappe.db.get_value("Item Default", {"parent": item.item_code}, "custom_branch")
-			if item_branch and item.branch != item_branch:
-				item.branch = item_branch
-				
-			item_cost_center = frappe.db.get_value("Item Default", {"parent": item.item_code}, "buying_cost_center")
-			if item_cost_center and item.cost_center != item_cost_center:
-				item.cost_center = item_cost_center
+		item_branch = frappe.db.get_value("Item Default", {"parent": item.item_code}, "custom_branch")
+		if item_branch and item.branch != item_branch:
+			item.branch = item_branch
+
+		item_cost_center = frappe.db.get_value(
+			"Item Default", {"parent": item.item_code}, "buying_cost_center"
+		)
+		if item_cost_center and item.cost_center != item_cost_center:
+			item.cost_center = item_cost_center
 
 
 def on_asset_repair_validate(doc, method):
@@ -385,9 +393,7 @@ def on_stock_entry_validate(doc, method):
 	asset_owner = frappe.db.get_value("Asset", asset, "asset_owner")
 
 	settings = frappe.get_single("Songa Customization Settings")
-	expense_account = (
-		settings.lease_to_own if asset_owner == "Customer" else settings.internal_consumption
-	)
+	expense_account = settings.lease_to_own if asset_owner == "Customer" else settings.internal_consumption
 
 	if not expense_account:
 		return

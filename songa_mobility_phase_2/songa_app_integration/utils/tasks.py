@@ -20,5 +20,8 @@ def process_pending_mpesa_express_requests():
 			doc = frappe.get_doc("Mpesa Express Request", request)
 			process_mpesa_express_request(doc)
 		except Exception:
-			frappe.log_error(frappe.get_traceback(), f"Failed to process Mpesa Express Request {request}")
+			frappe.log_error(
+				frappe.get_traceback(),
+				f"Failed to process Mpesa Express Request {request}",
+			)
 			continue

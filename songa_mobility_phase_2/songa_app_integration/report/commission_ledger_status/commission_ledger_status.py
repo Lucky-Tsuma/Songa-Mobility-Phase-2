@@ -12,7 +12,12 @@ def execute(filters=None):
 
 def get_columns():
 	return [
-		{"fieldname": "posting_date", "label": "Date", "fieldtype": "Date", "width": 100},
+		{
+			"fieldname": "posting_date",
+			"label": "Date",
+			"fieldtype": "Date",
+			"width": 100,
+		},
 		{
 			"fieldname": "name",
 			"label": "Ledger Entry",
@@ -20,12 +25,38 @@ def get_columns():
 			"options": "Driver Commission Ledger",
 			"width": 170,
 		},
-		{"fieldname": "driver", "label": "Driver", "fieldtype": "Link", "options": "Driver", "width": 120},
-		{"fieldname": "driver_name", "label": "Driver Name", "fieldtype": "Data", "width": 150},
-		{"fieldname": "transaction_type", "label": "Type", "fieldtype": "Data", "width": 100},
+		{
+			"fieldname": "driver",
+			"label": "Driver",
+			"fieldtype": "Link",
+			"options": "Driver",
+			"width": 120,
+		},
+		{
+			"fieldname": "driver_name",
+			"label": "Driver Name",
+			"fieldtype": "Data",
+			"width": 150,
+		},
+		{
+			"fieldname": "transaction_type",
+			"label": "Type",
+			"fieldtype": "Data",
+			"width": 100,
+		},
 		{"fieldname": "usage", "label": "Usage", "fieldtype": "Data", "width": 150},
-		{"fieldname": "amount", "label": "Amount", "fieldtype": "Currency", "width": 120},
-		{"fieldname": "workflow_state", "label": "Status", "fieldtype": "Data", "width": 110},
+		{
+			"fieldname": "amount",
+			"label": "Amount",
+			"fieldtype": "Currency",
+			"width": 120,
+		},
+		{
+			"fieldname": "workflow_state",
+			"label": "Status",
+			"fieldtype": "Data",
+			"width": 110,
+		},
 		{
 			"fieldname": "journal_entry",
 			"label": "Journal Entry",
@@ -51,7 +82,10 @@ def get_data(filters):
 		conditions["docstatus"] = ["<", 2]
 
 	if filters.get("from_date") and filters.get("to_date"):
-		conditions["posting_date"] = ["between", [filters.get("from_date"), filters.get("to_date")]]
+		conditions["posting_date"] = [
+			"between",
+			[filters.get("from_date"), filters.get("to_date")],
+		]
 	elif filters.get("from_date"):
 		conditions["posting_date"] = [">=", filters.get("from_date")]
 	elif filters.get("to_date"):
@@ -85,6 +119,9 @@ def get_chart(data):
 
 	labels = list(counts.keys())
 	return {
-		"data": {"labels": labels, "datasets": [{"name": "Entries", "values": [counts[label] for label in labels]}]},
+		"data": {
+			"labels": labels,
+			"datasets": [{"name": "Entries", "values": [counts[label] for label in labels]}],
+		},
 		"type": "donut",
 	}

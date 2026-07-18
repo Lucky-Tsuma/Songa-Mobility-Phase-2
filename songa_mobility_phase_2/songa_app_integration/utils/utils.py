@@ -63,9 +63,9 @@ def get_commission_deduction_accounts(rental_days_record_name=None, KWh_record_n
 		return debit_account, credit_account
 
 	frappe.throw(
-		"Cannot determine commission deduction accounts. "
-		"A Rental Days or Energy KWh record is required."
+		"Cannot determine commission deduction accounts. A Rental Days or Energy KWh record is required."
 	)
+
 
 def _get_driver_id(driver_id):
 	# direct function calls - driver_id as argument
@@ -85,6 +85,7 @@ def _get_driver_id(driver_id):
 
 	return None
 
+
 def _get_company(company):
 	# direct function calls - company as argument
 	if company:
@@ -101,6 +102,7 @@ def _get_company(company):
 		except (json.JSONDecodeError, AttributeError):
 			pass
 	return frappe.defaults.get_user_default("company")
+
 
 def reconcile_payments(driver_id):
 	try:
@@ -129,7 +131,10 @@ def reconcile_payments(driver_id):
 
 		if not reconcile_doc.invoices or not reconcile_doc.payments:
 			frappe.log_error("No invoices or payments found for driver", "Reconcile Payments Error")
-			return {"status": "error", "message": "No invoices or payments found for driver"}
+			return {
+				"status": "error",
+				"message": "No invoices or payments found for driver",
+			}
 
 		args = {
 			"invoices": [invoice.as_dict() for invoice in reconcile_doc.invoices],
@@ -138,7 +143,10 @@ def reconcile_payments(driver_id):
 
 		if not args["invoices"] or not args["payments"]:
 			frappe.log_error("No invoices or payments found for driver", "Reconcile Payments Error")
-			return {"status": "error", "message": "No invoices or payments found for driver"}
+			return {
+				"status": "error",
+				"message": "No invoices or payments found for driver",
+			}
 
 		reconcile_doc.allocate_entries(args)
 		reconcile_doc.reconcile()
@@ -215,7 +223,10 @@ def allocate_commission(driver_commission_ledger_name, commit=True):
 			journal_entry.insert()
 			journal_entry.submit()
 			frappe.set_value(
-				"Driver Commission Ledger", driver_commission_ledger_name, "journal_entry", journal_entry.name
+				"Driver Commission Ledger",
+				driver_commission_ledger_name,
+				"journal_entry",
+				journal_entry.name,
 			)
 			if commit:
 				frappe.db.commit()
@@ -239,7 +250,10 @@ def allocate_commission(driver_commission_ledger_name, commit=True):
 
 @frappe.whitelist(allow_guest=False)
 def deduct_commission(
-	driver_commission_ledger_name, rental_days_record_name=None, KWh_record_name=None, commit=True
+	driver_commission_ledger_name,
+	rental_days_record_name=None,
+	KWh_record_name=None,
+	commit=True,
 ):
 	try:
 		driver_commission_ledger = frappe.get_doc("Driver Commission Ledger", driver_commission_ledger_name)
@@ -258,11 +272,15 @@ def deduct_commission(
 
 		if not rental_days_record_name:
 			rental_days_record_name = frappe.db.get_value(
-				"Rental Days", {"driver_commission_ledger": driver_commission_ledger_name}, "name"
+				"Rental Days",
+				{"driver_commission_ledger": driver_commission_ledger_name},
+				"name",
 			)
 		if not KWh_record_name:
 			KWh_record_name = frappe.db.get_value(
-				"Energy KWh", {"driver_commission_ledger": driver_commission_ledger_name}, "name"
+				"Energy KWh",
+				{"driver_commission_ledger": driver_commission_ledger_name},
+				"name",
 			)
 
 		# Lock commission ledger rows for this driver to prevent race conditions
@@ -329,7 +347,10 @@ def deduct_commission(
 			journal_entry.insert()
 			journal_entry.submit()
 			frappe.set_value(
-				"Driver Commission Ledger", driver_commission_ledger_name, "journal_entry", journal_entry.name
+				"Driver Commission Ledger",
+				driver_commission_ledger_name,
+				"journal_entry",
+				journal_entry.name,
 			)
 
 			if rental_days_record_name:
@@ -371,7 +392,6 @@ def deduct_commission(
 def get_commission_balance_by_driver(driver_id=None, company=None):
 	"""Returns the commission payable for a driver"""
 	try:
-
 		driver_id = _get_driver_id(driver_id)
 
 		if not driver_id:
@@ -403,7 +423,6 @@ def get_commission_balance_by_driver(driver_id=None, company=None):
 @frappe.whitelist(allow_guest=False)
 def get_rental_days_balance_by_driver(driver_id=None):
 	try:
-
 		driver_id = _get_driver_id(driver_id)
 
 		if not driver_id:
@@ -426,7 +445,6 @@ def get_rental_days_balance_by_driver(driver_id=None):
 @frappe.whitelist(allow_guest=False)
 def get_energy_kwh_balance_by_driver(driver_id=None):
 	try:
-		
 		driver_id = _get_driver_id(driver_id)
 
 		if not driver_id:
@@ -568,31 +586,34 @@ def process_mpesa_express_request(doc):
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Mpesa Express Request Workflow Error")
 		frappe.throw(str(e))
+
+
 @frappe.whitelist(allow_guest=False)
 def get_linked_supplier(customer):
-    """Returns the supplier linked to a customer via Party Link doctype"""
-    try:
-        if not customer:
-            frappe.throw("Customer is required to get linked supplier")
+	"""Returns the supplier linked to a customer via Party Link doctype"""
+	try:
+		if not customer:
+			frappe.throw("Customer is required to get linked supplier")
 
-        # Check for linked supplier where Customer is either secondary or primary party
-        linked_supplier = frappe.db.get_value(
-            "Party Link",
-            {"secondary_role": "Customer", "secondary_party": customer},
-            "primary_party"
-        ) or frappe.db.get_value(
-            "Party Link",
-            {"primary_role": "Customer", "primary_party": customer},
-            "secondary_party"
-        )
+		# Check for linked supplier where Customer is either secondary or primary party
+		linked_supplier = frappe.db.get_value(
+			"Party Link",
+			{"secondary_role": "Customer", "secondary_party": customer},
+			"primary_party",
+		) or frappe.db.get_value(
+			"Party Link",
+			{"primary_role": "Customer", "primary_party": customer},
+			"secondary_party",
+		)
 
-        return linked_supplier
+		return linked_supplier
 
-    except frappe.ValidationError:
-        raise
-    except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "Get Linked Supplier Error")
-        frappe.throw(str(e))
+	except frappe.ValidationError:
+		raise
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Linked Supplier Error")
+		frappe.throw(str(e))
+
 
 @frappe.whitelist(allow_guest=False)
 def get_branch_and_cost_center_by_supplier(supplier):

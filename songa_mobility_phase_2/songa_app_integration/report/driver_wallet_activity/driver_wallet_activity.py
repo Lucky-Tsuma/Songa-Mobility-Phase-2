@@ -17,14 +17,51 @@ def execute(filters=None):
 
 def get_columns():
 	return [
-		{"fieldname": "posting_date", "label": "Date", "fieldtype": "Date", "width": 100},
-		{"fieldname": "driver", "label": "Driver", "fieldtype": "Link", "options": "Driver", "width": 130},
-		{"fieldname": "driver_name", "label": "Driver Name", "fieldtype": "Data", "width": 160},
+		{
+			"fieldname": "posting_date",
+			"label": "Date",
+			"fieldtype": "Date",
+			"width": 100,
+		},
+		{
+			"fieldname": "driver",
+			"label": "Driver",
+			"fieldtype": "Link",
+			"options": "Driver",
+			"width": 130,
+		},
+		{
+			"fieldname": "driver_name",
+			"label": "Driver Name",
+			"fieldtype": "Data",
+			"width": 160,
+		},
 		{"fieldname": "wallet", "label": "Wallet", "fieldtype": "Data", "width": 110},
-		{"fieldname": "transaction_type", "label": "Type", "fieldtype": "Data", "width": 110},
-		{"fieldname": "quantity", "label": "Qty", "fieldtype": "Float", "width": 90, "precision": 2},
-		{"fieldname": "amount", "label": "Amount", "fieldtype": "Currency", "width": 120},
-		{"fieldname": "payment_method", "label": "Payment Method", "fieldtype": "Data", "width": 120},
+		{
+			"fieldname": "transaction_type",
+			"label": "Type",
+			"fieldtype": "Data",
+			"width": 110,
+		},
+		{
+			"fieldname": "quantity",
+			"label": "Qty",
+			"fieldtype": "Float",
+			"width": 90,
+			"precision": 2,
+		},
+		{
+			"fieldname": "amount",
+			"label": "Amount",
+			"fieldtype": "Currency",
+			"width": 120,
+		},
+		{
+			"fieldname": "payment_method",
+			"label": "Payment Method",
+			"fieldtype": "Data",
+			"width": 120,
+		},
 		{"fieldname": "status", "label": "Status", "fieldtype": "Data", "width": 110},
 		{
 			"fieldname": "reference_name",
@@ -33,7 +70,12 @@ def get_columns():
 			"options": "reference_doctype",
 			"width": 150,
 		},
-		{"fieldname": "reference_doctype", "label": "Reference Type", "fieldtype": "Data", "width": 130},
+		{
+			"fieldname": "reference_doctype",
+			"label": "Reference Type",
+			"fieldtype": "Data",
+			"width": 130,
+		},
 	]
 
 
@@ -62,7 +104,10 @@ def _common_filters(filters):
 	if filters.get("driver"):
 		conditions["driver"] = filters.get("driver")
 	if filters.get("from_date") and filters.get("to_date"):
-		conditions["posting_date"] = ["between", [filters.get("from_date"), filters.get("to_date")]]
+		conditions["posting_date"] = [
+			"between",
+			[filters.get("from_date"), filters.get("to_date")],
+		]
 	elif filters.get("from_date"):
 		conditions["posting_date"] = [">=", filters.get("from_date")]
 	elif filters.get("to_date"):

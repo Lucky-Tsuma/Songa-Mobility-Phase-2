@@ -23,13 +23,49 @@ def get_columns():
 	return [
 		{"fieldname": "period", "label": "Period", "fieldtype": "Data", "width": 110},
 		{"fieldname": "wallet", "label": "Wallet", "fieldtype": "Data", "width": 110},
-		{"fieldname": "payment_method", "label": "Payment Method", "fieldtype": "Data", "width": 130},
-		{"fieldname": "total_count", "label": "Recharges", "fieldtype": "Int", "width": 100},
-		{"fieldname": "completed_count", "label": "Completed", "fieldtype": "Int", "width": 100},
-		{"fieldname": "failed_count", "label": "Failed", "fieldtype": "Int", "width": 90},
-		{"fieldname": "success_rate", "label": "Success %", "fieldtype": "Percent", "width": 100},
-		{"fieldname": "recharge_amount", "label": "Amount (Completed)", "fieldtype": "Currency", "width": 160},
-		{"fieldname": "quantity", "label": "Qty (Completed)", "fieldtype": "Float", "width": 130, "precision": 2},
+		{
+			"fieldname": "payment_method",
+			"label": "Payment Method",
+			"fieldtype": "Data",
+			"width": 130,
+		},
+		{
+			"fieldname": "total_count",
+			"label": "Recharges",
+			"fieldtype": "Int",
+			"width": 100,
+		},
+		{
+			"fieldname": "completed_count",
+			"label": "Completed",
+			"fieldtype": "Int",
+			"width": 100,
+		},
+		{
+			"fieldname": "failed_count",
+			"label": "Failed",
+			"fieldtype": "Int",
+			"width": 90,
+		},
+		{
+			"fieldname": "success_rate",
+			"label": "Success %",
+			"fieldtype": "Percent",
+			"width": 100,
+		},
+		{
+			"fieldname": "recharge_amount",
+			"label": "Amount (Completed)",
+			"fieldtype": "Currency",
+			"width": 160,
+		},
+		{
+			"fieldname": "quantity",
+			"label": "Qty (Completed)",
+			"fieldtype": "Float",
+			"width": 130,
+			"precision": 2,
+		},
 	]
 
 
@@ -73,9 +109,7 @@ def get_data(filters):
 
 	rows = list(buckets.values())
 	for row in rows:
-		row["success_rate"] = (
-			(row["completed_count"] / row["total_count"]) * 100 if row["total_count"] else 0
-		)
+		row["success_rate"] = (row["completed_count"] / row["total_count"]) * 100 if row["total_count"] else 0
 
 	rows.sort(key=lambda r: (r["period"], r["wallet"], r["payment_method"] or ""))
 	return rows
@@ -86,7 +120,10 @@ def fetch_recharges(filters, doctype, qty_field):
 	if filters.get("company"):
 		conditions["company"] = filters.get("company")
 	if filters.get("from_date") and filters.get("to_date"):
-		conditions["posting_date"] = ["between", [filters.get("from_date"), filters.get("to_date")]]
+		conditions["posting_date"] = [
+			"between",
+			[filters.get("from_date"), filters.get("to_date")],
+		]
 	elif filters.get("from_date"):
 		conditions["posting_date"] = [">=", filters.get("from_date")]
 	elif filters.get("to_date"):

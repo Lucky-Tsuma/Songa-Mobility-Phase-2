@@ -20,19 +20,86 @@ def get_columns():
 			"options": "Asset Repair",
 			"width": 150,
 		},
-		{"fieldname": "asset", "label": "Asset", "fieldtype": "Link", "options": "Asset", "width": 130},
-		{"fieldname": "asset_name", "label": "Asset Name", "fieldtype": "Data", "width": 150},
-		{"fieldname": "custom_asset_type", "label": "Asset Type", "fieldtype": "Data", "width": 110},
-		{"fieldname": "custom_severity_type", "label": "Severity", "fieldtype": "Data", "width": 100},
-		{"fieldname": "repair_status", "label": "Repair Status", "fieldtype": "Data", "width": 110},
-		{"fieldname": "workflow_state", "label": "Workflow State", "fieldtype": "Data", "width": 170},
-		{"fieldname": "failure_date", "label": "Failure Date", "fieldtype": "Datetime", "width": 150},
-		{"fieldname": "completion_date", "label": "Completion Date", "fieldtype": "Datetime", "width": 150},
-		{"fieldname": "downtime", "label": "Downtime", "fieldtype": "Data", "width": 100},
-		{"fieldname": "stock_consumption", "label": "Stock Used", "fieldtype": "Check", "width": 90},
-		{"fieldname": "repair_cost", "label": "Repair Cost", "fieldtype": "Currency", "width": 120},
-		{"fieldname": "total_repair_cost", "label": "Total Cost", "fieldtype": "Currency", "width": 120},
-		{"fieldname": "cost_center", "label": "Cost Center", "fieldtype": "Link", "options": "Cost Center", "width": 130},
+		{
+			"fieldname": "asset",
+			"label": "Asset",
+			"fieldtype": "Link",
+			"options": "Asset",
+			"width": 130,
+		},
+		{
+			"fieldname": "asset_name",
+			"label": "Asset Name",
+			"fieldtype": "Data",
+			"width": 150,
+		},
+		{
+			"fieldname": "custom_asset_type",
+			"label": "Asset Type",
+			"fieldtype": "Data",
+			"width": 110,
+		},
+		{
+			"fieldname": "custom_severity_type",
+			"label": "Severity",
+			"fieldtype": "Data",
+			"width": 100,
+		},
+		{
+			"fieldname": "repair_status",
+			"label": "Repair Status",
+			"fieldtype": "Data",
+			"width": 110,
+		},
+		{
+			"fieldname": "workflow_state",
+			"label": "Workflow State",
+			"fieldtype": "Data",
+			"width": 170,
+		},
+		{
+			"fieldname": "failure_date",
+			"label": "Failure Date",
+			"fieldtype": "Datetime",
+			"width": 150,
+		},
+		{
+			"fieldname": "completion_date",
+			"label": "Completion Date",
+			"fieldtype": "Datetime",
+			"width": 150,
+		},
+		{
+			"fieldname": "downtime",
+			"label": "Downtime",
+			"fieldtype": "Data",
+			"width": 100,
+		},
+		{
+			"fieldname": "stock_consumption",
+			"label": "Stock Used",
+			"fieldtype": "Check",
+			"width": 90,
+		},
+		{
+			"fieldname": "repair_cost",
+			"label": "Repair Cost",
+			"fieldtype": "Currency",
+			"width": 120,
+		},
+		{
+			"fieldname": "total_repair_cost",
+			"label": "Total Cost",
+			"fieldtype": "Currency",
+			"width": 120,
+		},
+		{
+			"fieldname": "cost_center",
+			"label": "Cost Center",
+			"fieldtype": "Link",
+			"options": "Cost Center",
+			"width": 130,
+		},
 	]
 
 
@@ -93,7 +160,12 @@ def get_chart(data):
 	return {
 		"data": {
 			"labels": periods,
-			"datasets": [{"name": "Total Repair Cost", "values": [monthly[period] for period in periods]}],
+			"datasets": [
+				{
+					"name": "Total Repair Cost",
+					"values": [monthly[period] for period in periods],
+				}
+			],
 		},
 		"type": "bar",
 	}

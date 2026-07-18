@@ -139,7 +139,7 @@ app_include_js = [
 
 # override_doctype_class = {
 # 	"ToDo": "custom_app.overrides.CustomToDo"
-# }	
+# }
 
 # Document Events
 # ---------------
@@ -159,13 +159,13 @@ doc_events = {
 	"Driver": {
 		"after_insert": "songa_mobility_phase_2.songa_app_integration.events.events.on_driver_insert",
 	},
-    "Payment Entry": {
+	"Payment Entry": {
 		"on_submit": "songa_mobility_phase_2.songa_app_integration.events.events.on_payment_entry_submit",
 	},
 	"Journal Entry": {
 		"on_submit": "songa_mobility_phase_2.songa_app_integration.events.events.on_journal_entry_submit",
 	},
-    "Purchase Invoice": {
+	"Purchase Invoice": {
 		"validate": "songa_mobility_phase_2.songa_app_integration.events.events.on_purchase_invoice_validate",
 	},
 	"Stock Entry": {
@@ -280,8 +280,14 @@ fixtures = [
 		"dt": "Custom Field",
 		"filters": {"module": ["in", ["Songa App Integration", "Songa Mobility Phase 2"]]},
 	},
-	{"dt": "Workflow", "filters": {"document_type": ["in", ["Driver Commission Ledger", "Asset Repair"]]}},
-	{"dt": "Role", "filters": {"name": ["in", ["Songa App", "Commission Ledger Approver"]]}},
+	{
+		"dt": "Workflow",
+		"filters": {"document_type": ["in", ["Driver Commission Ledger", "Asset Repair"]]},
+	},
+	{
+		"dt": "Role",
+		"filters": {"name": ["in", ["Songa App", "Commission Ledger Approver"]]},
+	},
 	{"dt": "Notification", "filters": {"document_type": ["in", ["Asset Repair"]]}},
 	"Workflow State",
 	"Workflow Action Master",

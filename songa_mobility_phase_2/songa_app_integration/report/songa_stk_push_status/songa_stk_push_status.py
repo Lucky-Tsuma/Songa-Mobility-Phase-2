@@ -14,7 +14,12 @@ def execute(filters=None):
 
 def get_columns():
 	return [
-		{"fieldname": "creation", "label": "Request Date", "fieldtype": "Datetime", "width": 160},
+		{
+			"fieldname": "creation",
+			"label": "Request Date",
+			"fieldtype": "Datetime",
+			"width": 160,
+		},
 		{
 			"fieldname": "name",
 			"label": "STK Request",
@@ -22,8 +27,19 @@ def get_columns():
 			"options": "Mpesa Express Request",
 			"width": 170,
 		},
-		{"fieldname": "driver", "label": "Driver", "fieldtype": "Link", "options": "Driver", "width": 120},
-		{"fieldname": "driver_name", "label": "Driver Name", "fieldtype": "Data", "width": 150},
+		{
+			"fieldname": "driver",
+			"label": "Driver",
+			"fieldtype": "Link",
+			"options": "Driver",
+			"width": 120,
+		},
+		{
+			"fieldname": "driver_name",
+			"label": "Driver Name",
+			"fieldtype": "Data",
+			"width": 150,
+		},
 		{"fieldname": "wallet", "label": "Wallet", "fieldtype": "Data", "width": 100},
 		{
 			"fieldname": "reference_name",
@@ -32,11 +48,31 @@ def get_columns():
 			"options": "reference_doctype",
 			"width": 130,
 		},
-		{"fieldname": "phone_number", "label": "Phone", "fieldtype": "Data", "width": 120},
-		{"fieldname": "amount", "label": "Amount", "fieldtype": "Currency", "width": 110},
+		{
+			"fieldname": "phone_number",
+			"label": "Phone",
+			"fieldtype": "Data",
+			"width": 120,
+		},
+		{
+			"fieldname": "amount",
+			"label": "Amount",
+			"fieldtype": "Currency",
+			"width": 110,
+		},
 		{"fieldname": "status", "label": "Status", "fieldtype": "Data", "width": 110},
-		{"fieldname": "transaction_date", "label": "Completed On", "fieldtype": "Datetime", "width": 160},
-		{"fieldname": "reference_doctype", "label": "Reference Type", "fieldtype": "Data", "width": 120},
+		{
+			"fieldname": "transaction_date",
+			"label": "Completed On",
+			"fieldtype": "Datetime",
+			"width": 160,
+		},
+		{
+			"fieldname": "reference_doctype",
+			"label": "Reference Type",
+			"fieldtype": "Data",
+			"width": 120,
+		},
 	]
 
 
@@ -48,7 +84,10 @@ def get_data(filters):
 		label_to_doctype = {v: k for k, v in WALLET_LABELS.items()}
 		conditions["reference_doctype"] = label_to_doctype.get(filters.get("wallet"))
 	if filters.get("from_date") and filters.get("to_date"):
-		conditions["creation"] = ["between", [filters.get("from_date"), filters.get("to_date")]]
+		conditions["creation"] = [
+			"between",
+			[filters.get("from_date"), filters.get("to_date")],
+		]
 	elif filters.get("from_date"):
 		conditions["creation"] = [">=", filters.get("from_date")]
 	elif filters.get("to_date"):
