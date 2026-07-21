@@ -1,6 +1,17 @@
 import frappe
 
+from songa_mobility_phase_2.songa_app_integration.utils.songa_webhook import (
+	process_failed_songa_webhook_retries,
+)
+
 from .utils import process_mpesa_express_request
+
+
+def retry_failed_songa_webhooks():
+	try:
+		process_failed_songa_webhook_retries()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Failed to process Songa webhook retries")
 
 
 @frappe.whitelist(allow_guest=False)
