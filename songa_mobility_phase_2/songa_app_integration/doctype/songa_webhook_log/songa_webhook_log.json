@@ -129,8 +129,7 @@
    "fieldname": "endpoint",
    "fieldtype": "Data",
    "label": "Endpoint",
-   "length": 500,
-   "read_only": 1
+   "length": 500
   },
   {
    "fieldname": "http_status",
@@ -154,8 +153,7 @@
    "fieldname": "payload",
    "fieldtype": "Code",
    "label": "Payload",
-   "options": "JSON",
-   "read_only": 1
+   "options": "JSON"
   },
   {
    "fieldname": "response_body",
@@ -169,7 +167,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-07-18 19:00:24.398194",
+ "modified": "2026-07-21 22:43:50.115027",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Songa Webhook Log",
@@ -205,5 +203,6 @@
  "sort_order": "DESC",
  "states": [],
  "title_field": "context",
- "track_changes": 1
+ "track_changes": 1,
+ "track_seen": 1
 }
