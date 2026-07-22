@@ -178,11 +178,9 @@ doc_events = {
 
 scheduler_events = {
 	"cron": {
-		"* * * * *": [
-			"songa_mobility_phase_2.songa_app_integration.utils.tasks.process_pending_mpesa_express_requests"
-		],
 		"*/5 * * * *": [
-			"songa_mobility_phase_2.songa_app_integration.utils.tasks.retry_failed_songa_webhooks"
+			"songa_mobility_phase_2.songa_app_integration.utils.tasks.process_pending_mpesa_express_requests",
+			"songa_mobility_phase_2.songa_app_integration.utils.tasks.retry_failed_songa_webhooks",
 		],
 	}
 	# 	"all": [

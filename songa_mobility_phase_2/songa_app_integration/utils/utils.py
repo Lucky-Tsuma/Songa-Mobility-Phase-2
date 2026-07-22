@@ -526,9 +526,48 @@ def get_overall_balance(driver_id=None):
 		return {"status": "error", "message": str(e)}
 
 
+def _mpesa_wallet_action_type(reference_doctype):
+	if reference_doctype == "Rental Days":
+		return "Rental days recharge"
+	if reference_doctype == "Energy KWh":
+		return "Energy recharge"
+	return None
+
+
+def _mpesa_songa_webhook_already_sent(mpesa_request_name, reference_doctype):
+	action_type = _mpesa_wallet_action_type(reference_doctype)
+	if not action_type:
+		return False
+
+	return bool(
+		frappe.db.exists(
+			"Songa Webhook Log",
+			{
+				"status": "Sent",
+				"action_type": action_type,
+				"reference_doctype": "Mpesa Express Request",
+				"reference_name": mpesa_request_name,
+			},
+		)
+	)
+
+
+def _mark_mpesa_wallet_processed(mpesa_request_name):
+	frappe.db.set_value(
+		"Mpesa Express Request",
+		mpesa_request_name,
+		"custom_songa_wallet_processed",
+		1,
+		update_modified=False,
+	)
+
+
 @frappe.whitelist(allow_guest=False)
 def process_mpesa_express_request(doc):
 	try:
+		if getattr(doc, "custom_songa_wallet_processed", 0):
+			return
+
 		if doc.status not in ("Completed", "Failed"):
 			return
 
@@ -538,48 +577,43 @@ def process_mpesa_express_request(doc):
 		reference_doctype = doc.reference_doctype
 		reference_doc = frappe.get_doc(reference_doctype, doc.reference_name)
 
-		# Guard against duplicate triggers on an already-processed record
-		if reference_doc.status == doc.status:
-			return
-
-		try:
-			frappe.db.savepoint("mpesa_express_request")
-
-			frappe.set_value(reference_doctype, doc.reference_name, "status", doc.status)
-
-			frappe.db.commit()
-
-		except Exception:
-			frappe.db.rollback(save_point="mpesa_express_request")
-			raise
-
-		payload = {
-			"driver_id": reference_doc.driver,
-			"transaction_type": reference_doc.transaction_type,
-			"amount": reference_doc.amount,
-			"mpesa_express_request": doc.name,
-		}
+		if reference_doc.status != doc.status:
+			try:
+				frappe.db.savepoint("mpesa_express_request")
+				frappe.db.set_value(reference_doctype, doc.reference_name, "status", doc.status)
+				frappe.db.commit()
+			except Exception:
+				frappe.db.rollback(save_point="mpesa_express_request")
+				raise
 
 		if doc.status == "Completed":
-			if reference_doctype == "Rental Days":
-				payload["action_type"] = "Rental days recharge"
-				payload["rental_days_balance"] = get_rental_days_balance_by_driver(
-					driver_id=reference_doc.driver
-				)
-			elif reference_doctype == "Energy KWh":
-				payload["action_type"] = "Energy recharge"
-				payload["energy_kwh_balance"] = get_energy_kwh_balance_by_driver(
-					driver_id=reference_doc.driver
-				)
-			else:
-				return
+			if not _mpesa_songa_webhook_already_sent(doc.name, reference_doctype):
+				payload = {
+					"driver_id": reference_doc.driver,
+					"transaction_type": reference_doc.transaction_type,
+					"amount": reference_doc.amount,
+					"mpesa_express_request": doc.name,
+					"action_type": _mpesa_wallet_action_type(reference_doctype),
+				}
 
-			send_songa_webhook(payload, context="Mpesa Express Request")
+				if reference_doctype == "Rental Days":
+					payload["rental_days_balance"] = get_rental_days_balance_by_driver(
+						driver_id=reference_doc.driver
+					)
+				elif reference_doctype == "Energy KWh":
+					payload["energy_kwh_balance"] = get_energy_kwh_balance_by_driver(
+						driver_id=reference_doc.driver
+					)
+
+				send_songa_webhook(payload, context="Mpesa Express Request")
 		else:
 			frappe.logger().info(
 				f"{reference_doctype} recharge cancelled for driver {reference_doc.driver} "
 				f"due to failed M-Pesa payment."
 			)
+
+		_mark_mpesa_wallet_processed(doc.name)
+		frappe.db.commit()
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Mpesa Express Request Workflow Error")
