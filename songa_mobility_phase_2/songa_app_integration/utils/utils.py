@@ -526,6 +526,10 @@ def get_overall_balance(driver_id=None):
 		return {"status": "error", "message": str(e)}
 
 
+MAX_MPESA_WALLET_ATTEMPTS = 5
+MPESA_WALLET_RETRY_INTERVAL_MINUTES = 5
+
+
 def _mpesa_wallet_action_type(reference_doctype):
 	if reference_doctype == "Rental Days":
 		return "Rental days recharge"
@@ -556,16 +560,120 @@ def _mark_mpesa_wallet_processed(mpesa_request_name):
 	frappe.db.set_value(
 		"Mpesa Express Request",
 		mpesa_request_name,
-		"custom_songa_wallet_processed",
-		1,
+		{
+			"custom_songa_wallet_processed": 1,
+			"custom_songa_wallet_process_status": "Processed",
+			"custom_songa_wallet_last_attempt_on": frappe.utils.now_datetime(),
+		},
 		update_modified=False,
 	)
+
+
+def record_mpesa_wallet_processing_failure(mpesa_request_name):
+	"""Increment failed attempt count and abandon when the max is reached."""
+	attempt_count = (
+		frappe.db.get_value(
+			"Mpesa Express Request",
+			mpesa_request_name,
+			"custom_songa_wallet_attempt_count",
+		)
+		or 0
+	) + 1
+
+	values = {
+		"custom_songa_wallet_attempt_count": attempt_count,
+		"custom_songa_wallet_last_attempt_on": frappe.utils.now_datetime(),
+		"custom_songa_wallet_process_status": (
+			"Abandoned" if attempt_count >= MAX_MPESA_WALLET_ATTEMPTS else "Pending"
+		),
+	}
+	frappe.db.set_value(
+		"Mpesa Express Request",
+		mpesa_request_name,
+		values,
+		update_modified=False,
+	)
+	frappe.db.commit()
+	return values
+
+
+@frappe.whitelist(allow_guest=False)
+def reset_mpesa_wallet_processing(name):
+	"""Reset an Abandoned wallet request so the cron (or a manual retry) can pick it up."""
+	doc = frappe.get_doc("Mpesa Express Request", name)
+	process_status = getattr(doc, "custom_songa_wallet_process_status", None) or "Pending"
+
+	if process_status != "Abandoned":
+		frappe.throw("Only Abandoned M-Pesa wallet requests can be reset for retry.")
+
+	if getattr(doc, "custom_songa_wallet_processed", 0):
+		frappe.throw("This M-Pesa request is already marked as wallet-processed.")
+
+	frappe.db.set_value(
+		"Mpesa Express Request",
+		name,
+		{
+			"custom_songa_wallet_process_status": "Pending",
+			"custom_songa_wallet_attempt_count": 0,
+			"custom_songa_wallet_last_attempt_on": None,
+			"custom_songa_wallet_processed": 0,
+		},
+		update_modified=False,
+	)
+	frappe.db.commit()
+	return {
+		"status": "success",
+		"message": "M-Pesa wallet processing reset to Pending.",
+		"name": name,
+	}
+
+
+@frappe.whitelist(allow_guest=False)
+def retry_mpesa_wallet_processing(name):
+	"""Reset Abandoned state if needed, then process the wallet request once."""
+	doc = frappe.get_doc("Mpesa Express Request", name)
+	process_status = getattr(doc, "custom_songa_wallet_process_status", None) or "Pending"
+
+	if getattr(doc, "custom_songa_wallet_processed", 0) or process_status == "Processed":
+		return {
+			"status": "success",
+			"message": "M-Pesa wallet processing already completed.",
+			"name": name,
+		}
+
+	if process_status == "Abandoned":
+		reset_mpesa_wallet_processing(name)
+		doc.reload()
+
+	try:
+		process_mpesa_express_request(doc)
+	except Exception as e:
+		record_mpesa_wallet_processing_failure(name)
+		return {
+			"status": "error",
+			"message": str(e),
+			"name": name,
+		}
+
+	return {
+		"status": "success",
+		"message": "M-Pesa wallet processing completed.",
+		"name": name,
+	}
 
 
 @frappe.whitelist(allow_guest=False)
 def process_mpesa_express_request(doc):
 	try:
 		if getattr(doc, "custom_songa_wallet_processed", 0):
+			return
+
+		process_status = getattr(doc, "custom_songa_wallet_process_status", None) or "Pending"
+		if process_status == "Abandoned":
+			return
+
+		attempt_count = getattr(doc, "custom_songa_wallet_attempt_count", 0) or 0
+		if attempt_count >= MAX_MPESA_WALLET_ATTEMPTS:
 			return
 
 		if doc.status not in ("Completed", "Failed"):
