@@ -73,16 +73,54 @@ def _rollback_savepoint(save_point):
 		frappe.db.rollback()
 
 
+def _validate_songa_actor(user_email, required_roles):
+	"""Ensure the platform user exists, is enabled, and holds a required role."""
+	if not user_email:
+		frappe.local.response["http_status_code"] = 400
+		raise ValueError("user_email is required")
+
+	if not frappe.db.exists("User", user_email):
+		frappe.local.response["http_status_code"] = 404
+		raise frappe.DoesNotExistError("User not found")
+
+	if not frappe.db.get_value("User", user_email, "enabled"):
+		frappe.local.response["http_status_code"] = 403
+		raise frappe.PermissionError("User is disabled")
+
+	user_roles = set(frappe.get_roles(user_email))
+	if not user_roles.intersection(set(required_roles)):
+		frappe.local.response["http_status_code"] = 403
+		raise frappe.PermissionError(
+			f"User does not have permission for this action. Required role(s): {', '.join(required_roles)}"
+		)
+
+
+def _get_asset_repair_roles_for_state(workflow_state):
+	roles = frappe.get_all(
+		"Workflow Document State",
+		filters={
+			"parent": "Asset Repair",
+			"parenttype": "Workflow",
+			"state": workflow_state,
+		},
+		pluck="allow_edit",
+	)
+	return [role for role in roles if role and role != "All"]
+
+
+def _validate_asset_repair_actor(user_email, asset_repair_name):
+	workflow_state = frappe.db.get_value("Asset Repair", asset_repair_name, "workflow_state")
+	required_roles = _get_asset_repair_roles_for_state(workflow_state)
+	if not required_roles:
+		frappe.local.response["http_status_code"] = 400
+		raise frappe.ValidationError(f"No roles configured for workflow state: {workflow_state}")
+	_validate_songa_actor(user_email, required_roles)
+
+
 def _approve_commission_ledger_workflow(ledger_name):
-	"""Approve a Deduction ledger via workflow (Allocation ledgers are never auto-approved)."""
-	previous_user = frappe.session.user
-	try:
-		frappe.set_user("Administrator")
-		doc = frappe.get_doc("Driver Commission Ledger", ledger_name)
-		if doc.workflow_state == "Pending":
-			apply_workflow(doc, "Approve")
-	finally:
-		frappe.set_user(previous_user)
+	doc = frappe.get_doc("Driver Commission Ledger", ledger_name)
+	if doc.workflow_state == "Pending" and doc.transaction_type == "Deduction":
+		apply_workflow(doc, "Approve")
 
 
 def _complete_commission_deduction(ledger_name, rental_days_name=None, energy_kwh_name=None):
@@ -738,12 +776,8 @@ def _cancel_document(doctype, document_id, id_field):
 			)
 			journal_entry = frappe.get_doc("Journal Entry", driver_commission_ledger.journal_entry)
 
-			previous_user = frappe.session.user
-			try:
-				frappe.set_user("Administrator")
+			if driver_commission_ledger.workflow_state == "Approved":
 				apply_workflow(driver_commission_ledger, "Cancel")
-			finally:
-				frappe.set_user(previous_user)
 
 			journal_entry.flags.ignore_links = True
 			journal_entry.cancel()
@@ -841,9 +875,7 @@ def create_asset_repair():
 		failure_date = data.get("failure_date")
 		company = data.get("company")
 
-		if not frappe.db.exists("User", user_email):
-			frappe.local.response["http_status_code"] = 404
-			return {"status": "error", "message": "User not found"}
+		_validate_songa_actor(user_email, ["Technical Agent"])
 
 		if frappe.db.exists("Asset Repair", {"custom_asset_repair_id": asset_repair_id}):
 			frappe.local.response["http_status_code"] = 200
@@ -867,18 +899,23 @@ def create_asset_repair():
 			return {"status": "error", "message": "Severity Type not found"}
 
 		try:
-			# setting the user_email here, so its easy to identify who created the asset repair and will need updates
-			frappe.set_user(user_email)
-
 			asset_repair = frappe.new_doc("Asset Repair")
 			asset_repair.company = company or frappe.defaults.get_user_default("company")
 			asset_repair.custom_asset_repair_id = asset_repair_id
+			asset_repair.custom_songa_user = user_email
 			asset_repair.custom_severity_type_id = severity_type_id
 			asset_repair.asset = asset_id
 			asset_repair.custom_asset_type_id = asset_type_id
 			asset_repair.description = description
 			asset_repair.failure_date = frappe.utils.get_datetime(failure_date)
-			asset_repair.insert(ignore_permissions=True)
+			asset_repair.insert()
+			frappe.db.set_value(
+				"Asset Repair",
+				asset_repair.name,
+				"owner",
+				user_email,
+				update_modified=False,
+			)
 
 			apply_workflow(asset_repair, "Submit For Approval - Technical Agent")
 
@@ -894,12 +931,16 @@ def create_asset_repair():
 			frappe.db.rollback(save_point=savepoint)
 			raise
 
+	except frappe.PermissionError as e:
+		frappe.local.response["http_status_code"] = frappe.local.response.get("http_status_code") or 403
+		return {"status": "error", "message": str(e)}
+	except (frappe.DoesNotExistError, ValueError) as e:
+		status_code = frappe.local.response.get("http_status_code") or 400
+		frappe.local.response["http_status_code"] = status_code
+		return {"status": "error", "message": str(e)}
 	except Exception as e:
 		frappe.local.response["http_status_code"] = 500
 		return {"status": "error", "message": str(e)}
-
-	finally:
-		frappe.set_user("Administrator")
 
 
 @frappe.whitelist(allow_guest=False)
@@ -972,19 +1013,14 @@ def comment_on_asset_repair():
 		user_email = data.get("user_email")
 		comment = data.get("comment")
 
-		if not frappe.db.exists("User", user_email):
-			frappe.local.response["http_status_code"] = 404
-			return {"status": "error", "message": "User not found"}
-
 		if not frappe.db.exists("Asset Repair", {"custom_asset_repair_id": asset_repair_id}):
 			frappe.local.response["http_status_code"] = 404
 			return {"status": "error", "message": "Asset Repair not found"}
 
-		frappe.set_user(user_email)
-
 		reference_name = frappe.db.get_value(
 			"Asset Repair", {"custom_asset_repair_id": asset_repair_id}, "name"
 		)
+		_validate_asset_repair_actor(user_email, reference_name)
 
 		doc = frappe.get_doc(
 			{
@@ -996,14 +1032,20 @@ def comment_on_asset_repair():
 				"published": 1,
 			}
 		)
-		doc.insert(ignore_permissions=True)
+		doc.insert()
+		frappe.db.set_value("Comment", doc.name, "owner", user_email, update_modified=False)
 
 		return {"status": "success", "message": "Comment added successfully."}
+	except frappe.PermissionError as e:
+		frappe.local.response["http_status_code"] = frappe.local.response.get("http_status_code") or 403
+		return {"status": "error", "message": str(e)}
+	except (frappe.DoesNotExistError, frappe.ValidationError, ValueError) as e:
+		status_code = frappe.local.response.get("http_status_code") or 400
+		frappe.local.response["http_status_code"] = status_code
+		return {"status": "error", "message": str(e)}
 	except Exception as e:
 		frappe.local.response["http_status_code"] = 500
 		return {"status": "error", "message": str(e)}
-	finally:
-		frappe.set_user("Administrator")
 
 
 @frappe.whitelist(allow_guest=False)
@@ -1027,10 +1069,6 @@ def update_asset_repair():
 				"message": "updated_values must be a non-empty object",
 			}
 
-		if not frappe.db.exists("User", user_email):
-			frappe.local.response["http_status_code"] = 404
-			return {"status": "error", "message": "User not found"}
-
 		if not frappe.db.exists("Asset Repair", {"custom_asset_repair_id": asset_repair_id}):
 			frappe.local.response["http_status_code"] = 404
 			return {
@@ -1039,6 +1077,7 @@ def update_asset_repair():
 			}
 
 		repair_name = frappe.db.get_value("Asset Repair", {"custom_asset_repair_id": asset_repair_id}, "name")
+		_validate_asset_repair_actor(user_email, repair_name)
 
 		allowed_fields = {
 			"severity_type_id": {
@@ -1081,8 +1120,6 @@ def update_asset_repair():
 
 		fields_to_update = {}
 
-		frappe.set_user(user_email)
-
 		for key, value in updated_values.items():
 			field_config = allowed_fields[key]
 
@@ -1112,10 +1149,16 @@ def update_asset_repair():
 			"updated_fields": list(updated_values.keys()),
 		}
 
+	except frappe.PermissionError as e:
+		frappe.db.rollback()
+		frappe.local.response["http_status_code"] = frappe.local.response.get("http_status_code") or 403
+		return {"status": "error", "message": str(e)}
+	except (frappe.DoesNotExistError, frappe.ValidationError, ValueError) as e:
+		frappe.db.rollback()
+		status_code = frappe.local.response.get("http_status_code") or 400
+		frappe.local.response["http_status_code"] = status_code
+		return {"status": "error", "message": str(e)}
 	except Exception as e:
 		frappe.db.rollback()
 		frappe.local.response["http_status_code"] = 500
 		return {"status": "error", "message": str(e)}
-
-	finally:
-		frappe.set_user("Administrator")

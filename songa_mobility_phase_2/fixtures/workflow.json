@@ -412,6 +412,19 @@
     "workflow_builder_id": null
    },
    {
+    "action": "Approve",
+    "allow_self_approval": 1,
+    "allowed": "Songa App",
+    "condition": "doc.transaction_type == \"Deduction\"",
+    "next_state": "Approved",
+    "parent": "Driver Commission Ledger",
+    "parentfield": "transitions",
+    "parenttype": "Workflow",
+    "send_email_to_creator": 0,
+    "state": "Pending",
+    "workflow_builder_id": null
+   },
+   {
     "action": "Reject",
     "allow_self_approval": 1,
     "allowed": "Commission Ledger Approver",
