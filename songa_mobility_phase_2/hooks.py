@@ -294,7 +294,41 @@ fixtures = [
 	{"dt": "Notification", "filters": {"document_type": ["in", ["Asset Repair"]]}},
 	"Workflow State",
 	"Workflow Action Master",
-	"Custom DocPerm",
+	{
+		"dt": "Custom DocPerm",
+		"filters": {
+			"role": [
+				"in",
+				[
+					"Songa App",
+					"Commission Ledger Approver",
+					"Technical Agent",
+					"Lead Technician",
+					"Hub Manager",
+					"Stock User",
+				],
+			],
+			"parent": [
+				"in",
+				[
+					"Asset",
+					"Asset Repair",
+					"Comment",
+					"Driver Commission Ledger",
+					"Energy KWh",
+					"Item",
+					"Journal Entry",
+					"Material Request",
+					"Mpesa Express Request",
+					"Purchase Invoice",
+					"Rental Days",
+					"Songa Customization Settings",
+					"Songa Webhook Log",
+					"Stock Entry",
+				],
+			],
+		},
+	},
 	"Asset Type",
 	"Severity Type",
 ]
