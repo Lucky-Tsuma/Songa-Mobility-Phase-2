@@ -162,6 +162,22 @@ def reconcile_payments(driver_id):
 def allocate_commission(driver_commission_ledger_name, commit=True):
 	try:
 		driver_commission_ledger = frappe.get_doc("Driver Commission Ledger", driver_commission_ledger_name)
+
+		if driver_commission_ledger.transaction_type != "Allocation":
+			frappe.throw("Commission allocation is only supported for Allocation ledgers.")
+
+		if driver_commission_ledger.journal_entry:
+			return {
+				"status": "success",
+				"message": "Commission already allocated.",
+				"data": driver_commission_ledger.journal_entry,
+			}
+
+		if driver_commission_ledger.workflow_state != "Approved":
+			frappe.throw(
+				"Driver Commission Ledger must be Approved before posting the allocation Journal Entry."
+			)
+
 		driver = driver_commission_ledger.driver
 		supplier = frappe.db.get_value("Driver", driver, "transporter")
 		amount = driver_commission_ledger.amount
@@ -234,13 +250,13 @@ def allocate_commission(driver_commission_ledger_name, commit=True):
 			frappe.db.rollback(save_point="allocate_commission")
 			raise
 
+		reconcile_payments(driver_id=driver)
+
 		return {
 			"status": "success",
 			"message": "Commission allocated successfully.",
 			"data": journal_entry.name,
 		}
-
-		reconcile_payments(driver_id=driver)
 	except frappe.ValidationError:
 		raise
 	except Exception as e:
