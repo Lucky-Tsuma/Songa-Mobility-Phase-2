@@ -1,8 +1,14 @@
 import frappe
 
+from songa_mobility_phase_2.songa_app_integration.patches.backfill_mpesa_wallet_processed import (
+	ensure_mpesa_wallet_custom_fields,
+)
+
 
 def execute():
 	"""Initialize wallet process-status fields introduced for capped M-Pesa retries."""
+	ensure_mpesa_wallet_custom_fields()
+
 	if not frappe.db.has_column("Mpesa Express Request", "custom_songa_wallet_process_status"):
 		return
 

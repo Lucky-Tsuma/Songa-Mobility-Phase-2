@@ -529,6 +529,11 @@ def get_overall_balance(driver_id=None):
 MAX_MPESA_WALLET_ATTEMPTS = 5
 MPESA_WALLET_RETRY_INTERVAL_MINUTES = 5
 
+MPESA_WALLET_ACCOUNT_FIELDS = {
+	"Energy KWh": ("battery_swap_mpesa_debit", "battery_swap_mpesa_credit"),
+	"Rental Days": ("rental_recharge_mpesa_debit", "rental_recharge_mpesa_credit"),
+}
+
 
 def _mpesa_wallet_action_type(reference_doctype):
 	if reference_doctype == "Rental Days":
@@ -536,6 +541,128 @@ def _mpesa_wallet_action_type(reference_doctype):
 	if reference_doctype == "Energy KWh":
 		return "Energy recharge"
 	return None
+
+
+def get_mpesa_wallet_accounts(reference_doctype):
+	"""Return debit/credit accounts for an M-Pesa wallet recharge Journal Entry."""
+	fields = MPESA_WALLET_ACCOUNT_FIELDS.get(reference_doctype)
+	if not fields:
+		frappe.throw(f"Unsupported M-Pesa wallet reference doctype: {reference_doctype}")
+
+	settings = frappe.get_single("Songa Customization Settings")
+	debit_account = settings.get(fields[0])
+	credit_account = settings.get(fields[1])
+	missing = [frappe.unscrub(field) for field in fields if not settings.get(field)]
+	if missing:
+		frappe.throw(
+			"Please set the following accounts on Songa Customization Settings: " + ", ".join(missing)
+		)
+
+	return debit_account, credit_account
+
+
+def post_mpesa_wallet_journal_entry(mpesa_doc, reference_doc):
+	"""
+	Create and submit the Songa wallet Journal Entry for a completed M-Pesa STK request.
+
+	Idempotent: returns an existing linked JE if custom_songa_journal_entry is already set.
+	"""
+	existing_je = getattr(mpesa_doc, "custom_songa_journal_entry", None) or frappe.db.get_value(
+		"Mpesa Express Request",
+		mpesa_doc.name,
+		"custom_songa_journal_entry",
+	)
+	if existing_je:
+		return existing_je
+
+	if mpesa_doc.status != "Completed":
+		frappe.throw("M-Pesa wallet Journal Entry can only be posted for Completed requests.")
+
+	reference_doctype = mpesa_doc.reference_doctype
+	if reference_doctype not in MPESA_WALLET_ACCOUNT_FIELDS:
+		frappe.throw(f"Unsupported M-Pesa wallet reference doctype: {reference_doctype}")
+
+	driver = reference_doc.driver
+	if not driver or not frappe.db.exists("Driver", driver):
+		frappe.throw("Driver not found on the M-Pesa reference document.")
+
+	supplier = frappe.db.get_value("Driver", driver, "transporter")
+	if not supplier:
+		frappe.throw("Driver does not have an associated supplier")
+
+	amount = reference_doc.amount
+	if not amount or amount <= 0:
+		frappe.throw("Amount must be greater than zero for M-Pesa wallet Journal Entry.")
+
+	company = reference_doc.company or frappe.defaults.get_user_default("company")
+	if not company:
+		frappe.throw("Company is required to post the M-Pesa wallet Journal Entry.")
+
+	debit_account, credit_account = get_mpesa_wallet_accounts(reference_doctype)
+
+	branch_and_cost_center_dict = get_branch_and_cost_center_by_supplier(supplier=supplier)
+	branch = branch_and_cost_center_dict.get("branch", "")
+	cost_center = branch_and_cost_center_dict.get("cost_center", "")
+	branch_cost_center_fields = {
+		**({"branch": branch} if branch else {}),
+		**({"cost_center": cost_center} if cost_center else {}),
+	}
+
+	driver_name = frappe.db.get_value("Driver", driver, "full_name") or driver
+	user_remark = (
+		f"M-Pesa wallet recharge for driver {driver_name} - "
+		f"{reference_doctype} {reference_doc.name} - Mpesa Express Request {mpesa_doc.name}"
+	)
+
+	journal_entry = frappe.get_doc(
+		{
+			"doctype": "Journal Entry",
+			"posting_date": frappe.utils.nowdate(),
+			"voucher_type": "Journal Entry",
+			"company": company,
+			"cheque_no": mpesa_doc.transaction_id or mpesa_doc.name,
+			"cheque_date": frappe.utils.nowdate(),
+			"user_remark": user_remark,
+			"accounts": [
+				{
+					"account": debit_account,
+					"debit_in_account_currency": amount,
+					"credit_in_account_currency": 0,
+					"party_type": "Supplier",
+					"party": supplier,
+					**branch_cost_center_fields,
+					"is_advance": "No",
+				},
+				{
+					"account": credit_account,
+					"debit_in_account_currency": 0,
+					"credit_in_account_currency": amount,
+					**branch_cost_center_fields,
+					"is_advance": "No",
+				},
+			],
+		}
+	)
+
+	try:
+		frappe.db.savepoint("mpesa_wallet_journal_entry")
+		journal_entry.insert()
+		journal_entry.submit()
+		frappe.db.set_value(
+			"Mpesa Express Request",
+			mpesa_doc.name,
+			{
+				"custom_songa_journal_entry": journal_entry.name,
+				"is_reconciled": 1,
+			},
+			update_modified=False,
+		)
+		frappe.db.commit()
+	except Exception:
+		frappe.db.rollback(save_point="mpesa_wallet_journal_entry")
+		raise
+
+	return journal_entry.name
 
 
 def _mpesa_songa_webhook_already_sent(mpesa_request_name, reference_doctype):
@@ -695,6 +822,8 @@ def process_mpesa_express_request(doc):
 				raise
 
 		if doc.status == "Completed":
+			post_mpesa_wallet_journal_entry(doc, reference_doc)
+
 			if not _mpesa_songa_webhook_already_sent(doc.name, reference_doctype):
 				payload = {
 					"driver_id": reference_doc.driver,
