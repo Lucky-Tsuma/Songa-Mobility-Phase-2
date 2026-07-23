@@ -83,17 +83,33 @@ frappe.songa_wallet_c2b.open_link_dialog = (frm) => {
 	});
 
 	dialog.show();
-	frappe.songa_wallet_c2b.run_search(dialog);
+	// Field defaults are not always available via get_value() until set after show.
+	if (frm.doc.amount != null && frm.doc.amount !== "") {
+		dialog.set_value("amount", frm.doc.amount);
+	}
+	frappe.songa_wallet_c2b.run_search(dialog, { amount: frm.doc.amount });
 };
 
-frappe.songa_wallet_c2b.run_search = (dialog) => {
-	const values = dialog.get_values() || {};
+frappe.songa_wallet_c2b.run_search = (dialog, fallback = {}) => {
+	const full_name = dialog.get_value("full_name") || fallback.full_name;
+	const transid = dialog.get_value("transid") || fallback.transid;
+	const amount =
+		dialog.get_value("amount") ??
+		(fallback.amount !== undefined && fallback.amount !== null && fallback.amount !== ""
+			? fallback.amount
+			: null);
+
+	if (!full_name && !transid && (amount === undefined || amount === null || amount === "")) {
+		frappe.msgprint(__("Provide at least one of Full Name, Trans ID, or Amount."));
+		return;
+	}
+
 	frappe.call({
 		method: `${frappe.songa_wallet_c2b.UTILS}.search_mpesa_c2b_for_wallet_link`,
 		args: {
-			full_name: values.full_name,
-			transid: values.transid,
-			amount: values.amount,
+			full_name,
+			transid,
+			amount,
 			limit: 20,
 		},
 		callback(r) {
