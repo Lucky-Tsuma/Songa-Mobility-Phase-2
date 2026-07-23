@@ -53,6 +53,8 @@ app_include_js = [
 # include js in doctype views
 doctype_js = {
 	"Mpesa Express Request": "public/js/mpesa_express_request.js",
+	"Rental Days": "public/js/wallet_c2b_link.js",
+	"Energy KWh": "public/js/wallet_c2b_link.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -172,6 +174,10 @@ doc_events = {
 	},
 	"Stock Entry": {
 		"validate": "songa_mobility_phase_2.songa_app_integration.events.events.on_stock_entry_validate",
+	},
+	"Mpesa C2B Payment Register": {
+		"validate": "songa_mobility_phase_2.songa_app_integration.events.events.suppress_c2b_payment_entry_for_songa_wallet",
+		"before_submit": "songa_mobility_phase_2.songa_app_integration.events.events.suppress_c2b_payment_entry_for_songa_wallet",
 	},
 }
 
@@ -320,6 +326,7 @@ fixtures = [
 					"Journal Entry",
 					"Material Request",
 					"Mpesa Express Request",
+					"Mpesa C2B Payment Register",
 					"Purchase Invoice",
 					"Rental Days",
 					"Songa Customization Settings",

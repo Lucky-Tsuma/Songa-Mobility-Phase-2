@@ -139,6 +139,7 @@ def fetch_recharges(filters, doctype, qty_field):
 			f"{qty_field} as quantity",
 			"driver_commission_ledger",
 			"mpesa_express_request",
+			"mpesa_c2b_payment_register",
 		],
 	)
 
@@ -146,6 +147,8 @@ def fetch_recharges(filters, doctype, qty_field):
 def get_payment_method(record):
 	if record.get("mpesa_express_request"):
 		return "M-Pesa"
+	if record.get("mpesa_c2b_payment_register"):
+		return "M-Pesa C2B"
 	if record.get("driver_commission_ledger"):
 		return "Commission"
 	return "Unspecified"
@@ -168,7 +171,7 @@ def get_chart(data):
 	if not periods:
 		return None
 
-	methods = ["M-Pesa", "Commission"]
+	methods = ["M-Pesa", "M-Pesa C2B", "Commission"]
 	totals = {method: {period: 0.0 for period in periods} for method in methods}
 	for row in data:
 		method = row["payment_method"] if row["payment_method"] in methods else "Commission"

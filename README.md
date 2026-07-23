@@ -331,12 +331,13 @@ Create a commission allocation ledger entry *(awaiting approval)*.
 | `driver_id` | ✅ | |
 | `amount` | ✅ | Positive number |
 | `no_of_days` | ✅ | Positive integer |
-| `payment_method` | ✅ | `"commission"` or `"mpesa"` |
+| `payment_method` | ✅ | `"commission"`, `"mpesa"`, or `"mpesa_c2b"` |
 | `phone_number` | if mpesa | Kenyan mobile format |
 | `company` | — | |
 
 - **Commission** — validates balance, submits Rental Days, auto-approves Deduction ledger
-- **M-Pesa** — returns `"status": "success"` with `mpesa_request`; wallet credits after STK push confirms
+- **M-Pesa** — returns `"status": "pending"` with `mpesa_request`; wallet credits after STK push confirms
+- **M-Pesa C2B** — returns `"status": "pending"` with wallet id; link a C2B Payment Register on the desk form, then Complete
 
 <br>
 

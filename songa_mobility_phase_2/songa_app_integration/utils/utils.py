@@ -561,24 +561,29 @@ def get_mpesa_wallet_accounts(reference_doctype):
 	return debit_account, credit_account
 
 
-def post_mpesa_wallet_journal_entry(mpesa_doc, reference_doc):
+def post_mpesa_wallet_journal_entry(payment_doc, reference_doc):
 	"""
-	Create and submit the Songa wallet Journal Entry for a completed M-Pesa STK request.
+	Create and submit the Songa wallet Journal Entry for a completed M-Pesa payment.
 
+	Supports Mpesa Express Request and Mpesa C2B Payment Register sources.
 	Idempotent: returns an existing linked JE if custom_songa_journal_entry is already set.
 	"""
-	existing_je = getattr(mpesa_doc, "custom_songa_journal_entry", None) or frappe.db.get_value(
-		"Mpesa Express Request",
-		mpesa_doc.name,
+	source_doctype = payment_doc.doctype
+	if source_doctype not in ("Mpesa Express Request", "Mpesa C2B Payment Register"):
+		frappe.throw(f"Unsupported M-Pesa payment source: {source_doctype}")
+
+	existing_je = getattr(payment_doc, "custom_songa_journal_entry", None) or frappe.db.get_value(
+		source_doctype,
+		payment_doc.name,
 		"custom_songa_journal_entry",
 	)
 	if existing_je:
 		return existing_je
 
-	if mpesa_doc.status != "Completed":
+	if source_doctype == "Mpesa Express Request" and payment_doc.status != "Completed":
 		frappe.throw("M-Pesa wallet Journal Entry can only be posted for Completed requests.")
 
-	reference_doctype = mpesa_doc.reference_doctype
+	reference_doctype = reference_doc.doctype
 	if reference_doctype not in MPESA_WALLET_ACCOUNT_FIELDS:
 		frappe.throw(f"Unsupported M-Pesa wallet reference doctype: {reference_doctype}")
 
@@ -609,9 +614,14 @@ def post_mpesa_wallet_journal_entry(mpesa_doc, reference_doc):
 	}
 
 	driver_name = frappe.db.get_value("Driver", driver, "full_name") or driver
+	if source_doctype == "Mpesa Express Request":
+		cheque_no = payment_doc.transaction_id or payment_doc.name
+	else:
+		cheque_no = payment_doc.transid or payment_doc.name
+
 	user_remark = (
 		f"M-Pesa wallet recharge for driver {driver_name} - "
-		f"{reference_doctype} {reference_doc.name} - Mpesa Express Request {mpesa_doc.name}"
+		f"{reference_doctype} {reference_doc.name} - {source_doctype} {payment_doc.name}"
 	)
 
 	journal_entry = frappe.get_doc(
@@ -620,7 +630,7 @@ def post_mpesa_wallet_journal_entry(mpesa_doc, reference_doc):
 			"posting_date": frappe.utils.nowdate(),
 			"voucher_type": "Journal Entry",
 			"company": company,
-			"cheque_no": mpesa_doc.transaction_id or mpesa_doc.name,
+			"cheque_no": cheque_no,
 			"cheque_date": frappe.utils.nowdate(),
 			"user_remark": user_remark,
 			"accounts": [
@@ -648,13 +658,13 @@ def post_mpesa_wallet_journal_entry(mpesa_doc, reference_doc):
 		frappe.db.savepoint("mpesa_wallet_journal_entry")
 		journal_entry.insert()
 		journal_entry.submit()
+		values = {"custom_songa_journal_entry": journal_entry.name}
+		if source_doctype == "Mpesa Express Request":
+			values["is_reconciled"] = 1
 		frappe.db.set_value(
-			"Mpesa Express Request",
-			mpesa_doc.name,
-			{
-				"custom_songa_journal_entry": journal_entry.name,
-				"is_reconciled": 1,
-			},
+			source_doctype,
+			payment_doc.name,
+			values,
 			update_modified=False,
 		)
 		frappe.db.commit()
@@ -665,7 +675,9 @@ def post_mpesa_wallet_journal_entry(mpesa_doc, reference_doc):
 	return journal_entry.name
 
 
-def _mpesa_songa_webhook_already_sent(mpesa_request_name, reference_doctype):
+def _mpesa_songa_webhook_already_sent(
+	payment_name, reference_doctype, source_doctype="Mpesa Express Request"
+):
 	action_type = _mpesa_wallet_action_type(reference_doctype)
 	if not action_type:
 		return False
@@ -676,17 +688,17 @@ def _mpesa_songa_webhook_already_sent(mpesa_request_name, reference_doctype):
 			{
 				"status": "Sent",
 				"action_type": action_type,
-				"reference_doctype": "Mpesa Express Request",
-				"reference_name": mpesa_request_name,
+				"reference_doctype": source_doctype,
+				"reference_name": payment_name,
 			},
 		)
 	)
 
 
-def _mark_mpesa_wallet_processed(mpesa_request_name):
+def _mark_mpesa_wallet_processed(payment_name, source_doctype="Mpesa Express Request"):
 	frappe.db.set_value(
-		"Mpesa Express Request",
-		mpesa_request_name,
+		source_doctype,
+		payment_name,
 		{
 			"custom_songa_wallet_processed": 1,
 			"custom_songa_wallet_process_status": "Processed",
@@ -696,12 +708,12 @@ def _mark_mpesa_wallet_processed(mpesa_request_name):
 	)
 
 
-def record_mpesa_wallet_processing_failure(mpesa_request_name):
+def record_mpesa_wallet_processing_failure(payment_name, source_doctype="Mpesa Express Request"):
 	"""Increment failed attempt count and abandon when the max is reached."""
 	attempt_count = (
 		frappe.db.get_value(
-			"Mpesa Express Request",
-			mpesa_request_name,
+			source_doctype,
+			payment_name,
 			"custom_songa_wallet_attempt_count",
 		)
 		or 0
@@ -715,8 +727,8 @@ def record_mpesa_wallet_processing_failure(mpesa_request_name):
 		),
 	}
 	frappe.db.set_value(
-		"Mpesa Express Request",
-		mpesa_request_name,
+		source_doctype,
+		payment_name,
 		values,
 		update_modified=False,
 	)
@@ -855,6 +867,245 @@ def process_mpesa_express_request(doc):
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Mpesa Express Request Workflow Error")
 		frappe.throw(str(e))
+
+
+def _clear_c2b_wallet_backref(c2b_name):
+	frappe.db.set_value(
+		"Mpesa C2B Payment Register",
+		c2b_name,
+		{
+			"custom_songa_reference_doctype": None,
+			"custom_songa_reference_name": None,
+			"submit_payment": 0,
+		},
+		update_modified=False,
+	)
+
+
+def _cancel_linked_c2b_payment_entry(c2b_doc):
+	payment_entry = getattr(c2b_doc, "payment_entry", None)
+	if not payment_entry:
+		return
+
+	pe_docstatus = frappe.db.get_value("Payment Entry", payment_entry, "docstatus")
+	if pe_docstatus != 1:
+		return
+
+	pe = frappe.get_doc("Payment Entry", payment_entry)
+	pe.flags.ignore_links = True
+	pe.cancel()
+
+
+@frappe.whitelist(allow_guest=False)
+def search_mpesa_c2b_for_wallet_link(full_name=None, transid=None, amount=None, limit=20):
+	"""Search unlinked C2B payments eligible for Songa wallet linking."""
+	if not any([full_name, transid, amount]):
+		frappe.throw("Provide at least one of Full Name, Trans ID, or Amount.")
+
+	try:
+		limit = min(max(int(limit or 20), 1), 50)
+	except (TypeError, ValueError):
+		limit = 20
+
+	filters = [
+		["docstatus", "<", 2],
+		["custom_songa_wallet_processed", "=", 0],
+	]
+	or_filters = [
+		["custom_songa_reference_name", "is", "not set"],
+		["custom_songa_reference_name", "=", ""],
+	]
+
+	if full_name:
+		filters.append(["full_name", "like", f"%{full_name}%"])
+	if transid:
+		filters.append(["transid", "=", transid])
+	if amount not in (None, ""):
+		try:
+			filters.append(["transamount", "=", float(amount)])
+		except (TypeError, ValueError):
+			frappe.throw("Amount must be a valid number.")
+
+	rows = frappe.get_all(
+		"Mpesa C2B Payment Register",
+		filters=filters,
+		or_filters=or_filters,
+		fields=["name", "transid", "full_name", "transamount", "transtime", "msisdn", "docstatus"],
+		order_by="creation desc",
+		limit_page_length=limit,
+	)
+	return {"status": "success", "data": rows}
+
+
+@frappe.whitelist(allow_guest=False)
+def link_mpesa_c2b_to_wallet(wallet_doctype, wallet_name, c2b_name):
+	"""Link a C2B payment to a submitted In Progress wallet recharge."""
+	if wallet_doctype not in ("Rental Days", "Energy KWh"):
+		frappe.throw("C2B linking is only supported for Rental Days and Energy KWh.")
+
+	wallet = frappe.get_doc(wallet_doctype, wallet_name)
+	if wallet.docstatus != 1:
+		frappe.throw("Wallet document must be submitted before linking a C2B payment.")
+	if wallet.transaction_type != "Recharge":
+		frappe.throw("Only Recharge documents can be linked to a C2B payment.")
+	if wallet.status != "In Progress":
+		frappe.throw("Wallet document must be In Progress to link a C2B payment.")
+	if wallet.get("driver_commission_ledger") or wallet.get("mpesa_express_request"):
+		frappe.throw("This recharge already has another payment channel linked.")
+	if wallet.get("mpesa_c2b_payment_register"):
+		frappe.throw("A C2B payment is already linked to this recharge.")
+
+	c2b = frappe.get_doc("Mpesa C2B Payment Register", c2b_name)
+	if c2b.docstatus == 2:
+		frappe.throw("Cancelled C2B payments cannot be linked.")
+	if getattr(c2b, "custom_songa_wallet_processed", 0):
+		frappe.throw("This C2B payment is already marked as wallet-processed.")
+
+	existing_ref = getattr(c2b, "custom_songa_reference_name", None)
+	if existing_ref and existing_ref != wallet_name:
+		frappe.throw(
+			f"C2B payment {c2b_name} is already linked to "
+			f"{c2b.custom_songa_reference_doctype} {existing_ref}."
+		)
+
+	wallet_amount = frappe.utils.flt(wallet.amount)
+	c2b_amount = frappe.utils.flt(c2b.transamount)
+	if wallet_amount != c2b_amount:
+		frappe.throw(
+			f"Amount mismatch: wallet amount is {wallet_amount} but C2B transamount is {c2b_amount}."
+		)
+
+	frappe.db.set_value(
+		wallet_doctype,
+		wallet_name,
+		"mpesa_c2b_payment_register",
+		c2b_name,
+		update_modified=True,
+	)
+	frappe.db.set_value(
+		"Mpesa C2B Payment Register",
+		c2b_name,
+		{
+			"custom_songa_reference_doctype": wallet_doctype,
+			"custom_songa_reference_name": wallet_name,
+			"submit_payment": 0,
+		},
+		update_modified=False,
+	)
+	frappe.db.commit()
+
+	return {
+		"status": "success",
+		"message": f"Linked C2B payment {c2b_name} to {wallet_doctype} {wallet_name}.",
+		"c2b_name": c2b_name,
+	}
+
+
+@frappe.whitelist(allow_guest=False)
+def unlink_mpesa_c2b_from_wallet(wallet_doctype, wallet_name):
+	"""Unlink a C2B payment while the wallet recharge is still In Progress."""
+	if wallet_doctype not in ("Rental Days", "Energy KWh"):
+		frappe.throw("C2B unlinking is only supported for Rental Days and Energy KWh.")
+
+	wallet = frappe.get_doc(wallet_doctype, wallet_name)
+	c2b_name = wallet.get("mpesa_c2b_payment_register")
+	if not c2b_name:
+		frappe.throw("No C2B payment is linked to this document.")
+	if wallet.status != "In Progress":
+		frappe.throw("C2B can only be unlinked while the wallet recharge is In Progress.")
+
+	if frappe.db.get_value("Mpesa C2B Payment Register", c2b_name, "custom_songa_wallet_processed"):
+		frappe.throw("Cannot unlink a C2B payment that has already been wallet-processed.")
+
+	frappe.db.set_value(wallet_doctype, wallet_name, "mpesa_c2b_payment_register", None)
+	_clear_c2b_wallet_backref(c2b_name)
+	frappe.db.commit()
+
+	return {
+		"status": "success",
+		"message": f"Unlinked C2B payment {c2b_name} from {wallet_doctype} {wallet_name}.",
+	}
+
+
+@frappe.whitelist(allow_guest=False)
+def process_mpesa_c2b_wallet_payment(wallet_doctype, wallet_name):
+	"""Complete a C2B-linked wallet recharge: status Completed, JE, webhook."""
+	if wallet_doctype not in ("Rental Days", "Energy KWh"):
+		frappe.throw("C2B wallet completion is only supported for Rental Days and Energy KWh.")
+
+	wallet = frappe.get_doc(wallet_doctype, wallet_name)
+	c2b_name = wallet.get("mpesa_c2b_payment_register")
+	if not c2b_name:
+		frappe.throw("Link a Mpesa C2B Payment Register before completing this recharge.")
+	if wallet.docstatus != 1:
+		frappe.throw("Wallet document must be submitted.")
+	if wallet.status not in ("In Progress", "Completed"):
+		frappe.throw("Wallet document must be In Progress (or Completed for retry) to complete.")
+
+	c2b = frappe.get_doc("Mpesa C2B Payment Register", c2b_name)
+
+	if getattr(c2b, "custom_songa_wallet_processed", 0):
+		if wallet.status != "Completed":
+			frappe.db.set_value(wallet_doctype, wallet_name, "status", "Completed")
+		return {
+			"status": "success",
+			"message": "C2B wallet processing already completed.",
+			"wallet_name": wallet_name,
+			"c2b_name": c2b_name,
+		}
+
+	if (
+		c2b.get("custom_songa_reference_doctype") != wallet_doctype
+		or c2b.get("custom_songa_reference_name") != wallet_name
+	):
+		frappe.throw("C2B payment is not linked to this wallet document.")
+
+	wallet_amount = frappe.utils.flt(wallet.amount)
+	c2b_amount = frappe.utils.flt(c2b.transamount)
+	if wallet_amount != c2b_amount:
+		frappe.throw(
+			f"Amount mismatch: wallet amount is {wallet_amount} but C2B transamount is {c2b_amount}."
+		)
+
+	try:
+		frappe.db.savepoint("mpesa_c2b_wallet_payment")
+		_cancel_linked_c2b_payment_entry(c2b)
+
+		post_mpesa_wallet_journal_entry(c2b, wallet)
+
+		if wallet.status != "Completed":
+			frappe.db.set_value(wallet_doctype, wallet_name, "status", "Completed")
+			wallet.reload()
+
+		if not _mpesa_songa_webhook_already_sent(
+			c2b.name, wallet_doctype, source_doctype="Mpesa C2B Payment Register"
+		):
+			payload = {
+				"driver_id": wallet.driver,
+				"transaction_type": wallet.transaction_type,
+				"amount": wallet.amount,
+				"mpesa_c2b_payment_register": c2b.name,
+				"action_type": _mpesa_wallet_action_type(wallet_doctype),
+			}
+			if wallet_doctype == "Rental Days":
+				payload["rental_days_balance"] = get_rental_days_balance_by_driver(driver_id=wallet.driver)
+			elif wallet_doctype == "Energy KWh":
+				payload["energy_kwh_balance"] = get_energy_kwh_balance_by_driver(driver_id=wallet.driver)
+			send_songa_webhook(payload, context="Mpesa C2B Payment Register")
+
+		_mark_mpesa_wallet_processed(c2b.name, source_doctype="Mpesa C2B Payment Register")
+		frappe.db.commit()
+	except Exception as e:
+		frappe.db.rollback(save_point="mpesa_c2b_wallet_payment")
+		frappe.log_error(frappe.get_traceback(), "Mpesa C2B Wallet Processing Error")
+		frappe.throw(str(e))
+
+	return {
+		"status": "success",
+		"message": "C2B wallet recharge completed.",
+		"wallet_name": wallet_name,
+		"c2b_name": c2b_name,
+	}
 
 
 @frappe.whitelist(allow_guest=False)

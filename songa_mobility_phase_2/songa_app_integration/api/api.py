@@ -6,6 +6,7 @@ import frappe
 from frappe.model.workflow import apply_workflow
 
 from ..utils.utils import (
+	_clear_c2b_wallet_backref,
 	deduct_commission,
 	get_commission_balance_by_driver,
 	get_energy_kwh_balance_by_driver,
@@ -254,14 +255,17 @@ def recharge_rental_days():
 
 		check_for_empty_values(data, mandatory_fields)
 
-		if payment_method not in ("commission", "mpesa"):
+		if payment_method not in ("commission", "mpesa", "mpesa_c2b"):
 			frappe.local.response["http_status_code"] = 400
 			return {
 				"status": "error",
-				"message": "Invalid payment method. Must be 'commission' or 'mpesa'",
+				"message": "Invalid payment method. Must be 'commission', 'mpesa', or 'mpesa_c2b'",
 			}
 
-		account_settings_error = _validate_recharge_account_settings("rental_recharge", payment_method)
+		account_settings_error = _validate_recharge_account_settings(
+			"rental_recharge",
+			"mpesa" if payment_method == "mpesa_c2b" else payment_method,
+		)
 		if account_settings_error:
 			return account_settings_error
 
@@ -385,6 +389,9 @@ def recharge_rental_days():
 					mpesa_express_request.name,
 				)
 
+			elif payment_method == "mpesa_c2b":
+				frappe.set_value("Rental Days", rental_days.name, "status", "In Progress")
+
 			frappe.db.commit()
 
 		except Exception:
@@ -397,6 +404,16 @@ def recharge_rental_days():
 				"status": "pending",
 				"message": "M-Pesa payment initiated. Rental days will be recharged once payment is confirmed.",
 				"mpesa_request": mpesa_express_request.name,
+			}
+
+		if payment_method == "mpesa_c2b":
+			return {
+				"status": "pending",
+				"message": (
+					"Rental days recharge created. Link an M-Pesa C2B Payment Register "
+					"on the document to complete the recharge."
+				),
+				"rental_day_id": rental_days.name,
 			}
 
 		return {
@@ -435,14 +452,17 @@ def recharge_kwh():
 
 		check_for_empty_values(data, mandatory_fields)
 
-		if payment_method not in ("commission", "mpesa"):
+		if payment_method not in ("commission", "mpesa", "mpesa_c2b"):
 			frappe.local.response["http_status_code"] = 400
 			return {
 				"status": "error",
-				"message": "Invalid payment method. Must be 'commission' or 'mpesa'",
+				"message": "Invalid payment method. Must be 'commission', 'mpesa', or 'mpesa_c2b'",
 			}
 
-		account_settings_error = _validate_recharge_account_settings("battery_swap", payment_method)
+		account_settings_error = _validate_recharge_account_settings(
+			"battery_swap",
+			"mpesa" if payment_method == "mpesa_c2b" else payment_method,
+		)
 		if account_settings_error:
 			return account_settings_error
 
@@ -564,6 +584,9 @@ def recharge_kwh():
 					mpesa_express_request.name,
 				)
 
+			elif payment_method == "mpesa_c2b":
+				frappe.set_value("Energy KWh", energy_kwh.name, "status", "In Progress")
+
 			frappe.db.commit()
 
 		except Exception:
@@ -575,6 +598,16 @@ def recharge_kwh():
 				"status": "pending",
 				"message": "M-Pesa payment initiated. Energy KWh will be recharged once payment is confirmed.",
 				"mpesa_request": mpesa_express_request.name,
+			}
+
+		if payment_method == "mpesa_c2b":
+			return {
+				"status": "pending",
+				"message": (
+					"Energy KWh recharge created. Link an M-Pesa C2B Payment Register "
+					"on the document to complete the recharge."
+				),
+				"energy_kwh_id": energy_kwh.name,
 			}
 
 		return {
@@ -785,6 +818,19 @@ def _cancel_document(doctype, document_id, id_field):
 			mpesa_express_request = frappe.get_doc("Mpesa Express Request", doc.mpesa_express_request)
 			mpesa_express_request.flags.ignore_links = True
 			mpesa_express_request.cancel()
+		elif doc.get("mpesa_c2b_payment_register"):
+			c2b_name = doc.mpesa_c2b_payment_register
+			je_name = frappe.db.get_value(
+				"Mpesa C2B Payment Register",
+				c2b_name,
+				"custom_songa_journal_entry",
+			)
+			if je_name:
+				journal_entry = frappe.get_doc("Journal Entry", je_name)
+				if journal_entry.docstatus == 1:
+					journal_entry.flags.ignore_links = True
+					journal_entry.cancel()
+			_clear_c2b_wallet_backref(c2b_name)
 
 	except Exception:
 		_rollback_savepoint(savepoint)

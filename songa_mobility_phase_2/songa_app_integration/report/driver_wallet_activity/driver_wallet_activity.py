@@ -168,6 +168,7 @@ def get_wallet_rows(filters, doctype, qty_field):
 			"status",
 			"driver_commission_ledger",
 			"mpesa_express_request",
+			"mpesa_c2b_payment_register",
 		],
 	)
 	rows = []
@@ -193,6 +194,8 @@ def get_wallet_rows(filters, doctype, qty_field):
 def get_payment_method(record):
 	if record.get("mpesa_express_request"):
 		return "M-Pesa"
+	if record.get("mpesa_c2b_payment_register"):
+		return "M-Pesa C2B"
 	if record.get("driver_commission_ledger"):
 		return "Commission"
 	return None

@@ -6,3 +6,4 @@
 # Patches added in this section will be executed after doctypes are migrated
 songa_mobility_phase_2.songa_app_integration.patches.backfill_mpesa_wallet_processed
 songa_mobility_phase_2.songa_app_integration.patches.backfill_mpesa_wallet_process_status
+songa_mobility_phase_2.songa_app_integration.patches.ensure_mpesa_c2b_wallet_custom_fields

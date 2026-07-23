@@ -11,6 +11,7 @@ _REFERENCE_KEYS = (
 	("commission_ledger", "Driver Commission Ledger"),
 	("asset_repair", "Asset Repair"),
 	("mpesa_express_request", "Mpesa Express Request"),
+	("mpesa_c2b_payment_register", "Mpesa C2B Payment Register"),
 )
 
 _MAX_RESPONSE_LENGTH = 10000
