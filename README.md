@@ -54,10 +54,11 @@ This app is the integration layer that:
 | 💰 **Driver wallets** | Tracks commission, rental days, and kWh balances; posts GL entries |
 | 📱 **Songa platform API** | Whitelisted REST endpoints for wallet and repair operations |
 | ✅ **Approvals** | Workflows for commission ledger and asset repair |
-| 🔔 **Webhooks** | Notifies Songa when commission ledger states change |
+| 📲 **M-Pesa** | STK Push (Express) and PayBill/Till (C2B) wallet recharges with Songa Journal Entries |
+| 🔔 **Webhooks** | Notifies Songa on commission, wallet recharge, asset repair, and related events *(with retry log)* |
 | 📊 **Analytics** | Native Frappe reports and dashboards for ops & finance |
 
-> **Single source of truth:** balance logic lives in `report_helpers.py` and is shared by reports, desk UI, and API responses — so numbers always match.
+> **Single source of truth:** balance logic lives in `report_helpers.py` and is shared by reports, desk UI, and API responses — so numbers always match. Rental / kWh balances count only **submitted** documents with `status = Completed`.
 
 ---
 
@@ -67,7 +68,7 @@ This app is the integration layer that:
 <tr>
 <td align="center"><strong>6</strong><br>Script reports</td>
 <td align="center"><strong>2</strong><br>Dashboards</td>
-<td align="center"><strong>6</strong><br>App DocTypes</td>
+<td align="center"><strong>7</strong><br>App DocTypes</td>
 <td align="center"><strong>12</strong><br>Platform API methods</td>
 <td align="center"><strong>2</strong><br>Workflows</td>
 </tr>
@@ -89,11 +90,13 @@ flowchart LR
         DCL[Commission Ledger]
         AR[Asset Repair]
         GL[General Ledger]
-        RPT[Reports & Dashboards]
+        RPT[Reports and Dashboards]
+        WHLOG[Songa Webhook Log]
     end
 
     subgraph External["External"]
-        MPESA[M-Pesa STK Push]
+        STK[M-Pesa STK Express]
+        C2B[M-Pesa C2B PayBill Till]
         WH[Songa Webhook]
     end
 
@@ -102,8 +105,12 @@ flowchart LR
     API --> AR
     WLT --> DCL
     DCL --> GL
-    DCL -->|Approved / Rejected| WH
-    WLT --> MPESA
+    WLT --> STK
+    WLT --> C2B
+    DCL --> WH
+    WLT --> WH
+    AR --> WH
+    WH -.->|failures retries| WHLOG
     WLT --> RPT
     AR --> RPT
 ```
@@ -112,9 +119,11 @@ flowchart LR
 
 | Wallet | DocType | Recharge via | Usage |
 |--------|---------|--------------|-------|
-| Commission | GL (Supplier party) | Allocation · Payment Entry | Deduction on wallet recharge |
-| Rental days | `Rental Days` | Commission · M-Pesa | Trip / lease consumption |
-| Energy (kWh) | `Energy KWh` | Commission · M-Pesa | Battery consumption |
+| Commission | GL (Supplier party) | Allocation · Payment Entry · lease JE | Deduction on wallet recharge |
+| Rental days | `Rental Days` | Commission · M-Pesa Express · M-Pesa C2B | Trip / lease consumption |
+| Energy (kWh) | `Energy KWh` | Commission · M-Pesa Express · M-Pesa C2B | Battery consumption |
+
+**Wallet recharge status:** `In Progress` → `Completed` / `Failed` → `Cancelled` on cancel. One payment channel per recharge (commission **or** Express **or** C2B).
 
 ---
 
@@ -126,7 +135,7 @@ flowchart LR
 |-----|---------|
 | **ERPNext** | Driver, Supplier, Asset, Asset Repair, accounting |
 | **HRMS** *(or ERPNext Driver)* | `Driver` doctype |
-| **frappe_mpsa_payments** *(or equivalent)* | `Mpesa Express Request` for STK push |
+| **frappe_mpsa_payments** *(or equivalent)* | `Mpesa Express Request` (STK) and `Mpesa C2B Payment Register` (PayBill/Till) |
 
 ### Install
 
@@ -142,6 +151,8 @@ bench migrate
 > - Driver Commission Account
 > - STK Push payment gateway
 > - Songa Webhook Endpoint
+> - Rental / battery-swap **M-Pesa** debit and credit accounts *(used for both Express and C2B wallet JEs)*
+> - Lease payment accounts *(optional; PE/JE commission-deduction webhooks)*
 > - Asset repair stock expense accounts *(lease-to-own, internal consumption)*
 
 ---
@@ -154,7 +165,7 @@ bench migrate
 
 | Area | What's inside |
 |------|---------------|
-| 🚀 **Shortcuts** | Driver · Driver Wallet Dashboard · Asset Maintenance Dashboard · STK Push · Settings |
+| 🚀 **Shortcuts** | Driver · Driver Wallet Dashboard · Asset Maintenance Dashboard · STK Push · Mpesa C2B · Songa Webhook Log · Settings |
 | 💳 **Driver Wallet** | Driver · Driver Commission Ledger · Rental Days · Energy KWh |
 | 🔧 **Asset Repair** | Asset · Asset Type · Severity Type |
 | ⚙️ **Settings** | Songa Customization Settings |
@@ -171,9 +182,10 @@ Located under `songa_app_integration/doctype/`
 | DocType | Essence |
 |---------|---------|
 | **Driver Commission Ledger** | Submittable ledger for **Allocation** (credit) and **Deduction** (debit for wallet recharge). Posts Journal Entry on approval. States: Pending → Approved / Rejected / Cancelled |
-| **Rental Days** | Trike rental-day wallet. **Recharge** adds days · **Usage** consumes them. Links to Commission Ledger or M-Pesa request |
+| **Rental Days** | Trike rental-day wallet. **Recharge** adds days · **Usage** consumes them. Links to Commission Ledger, M-Pesa Express, or M-Pesa C2B |
 | **Energy KWh** | Battery energy wallet — same recharge/usage pattern, quantity in kWh |
-| **Songa Customization Settings** | Singleton: commission GL account, M-Pesa gateway, webhook URL, repair expense accounts |
+| **Songa Customization Settings** | Singleton: commission GL account, M-Pesa gateway and JE accounts, webhook URL, lease/repair expense accounts |
+| **Songa Webhook Log** | Outbound webhook delivery log *(Failed / Sent / Abandoned)* with desk retry and scheduled retries |
 | **Asset Type** | Master categories *(TRIKE, BATTERY, …)* |
 | **Severity Type** | Fault severity levels *(LOW, MEDIUM, SERIOUS, CRITICAL)* |
 
@@ -184,12 +196,19 @@ Custom fields and client scripts ship via fixtures for:
 <details>
 <summary><strong>Click to expand full list</strong></summary>
 
-- **Driver** — supplier/transporter link for commission GL balance
+- **Driver** — supplier/transporter link for commission GL balance and M-Pesa JE party
+- **Mpesa Express Request** — Songa wallet processed / attempt / process status / journal entry fields; desk Process / Retry / Reset
+- **Mpesa C2B Payment Register** — Songa reference back-link, processed flag, journal entry; PE creation suppressed when wallet-linked
 - **Asset** / **Asset Repair** — Songa repair ID, asset/severity type, trike registration, workflow state
 - **Asset Repair Consumed Item** — UOM fetch on stock lines
 - **Payment Entry**, **Journal Entry**, **Purchase Invoice**, **Purchase Order**, **Sales Invoice**, **Stock Entry** — branch/cost-centre and accounting hooks
+- **Supplier** *(+ group)* — branch / cost center used on wallet JEs
 
 </details>
+
+### M-Pesa wallet accounting
+
+When an Express or C2B wallet recharge completes, Songa posts a **Journal Entry** using the M-Pesa debit/credit accounts from settings. The driver's **Supplier** (`Driver.transporter`) is set as party on the **credit** row. Linked C2B payments skip the stock Customer Payment Entry path so finance is not double-posted.
 
 ---
 
@@ -247,7 +266,7 @@ flowchart TD
 |--------|---------|--------|
 | **Driver Wallet Summary** | Fleet-wide commission, rental days, and kWh balances | System Manager · Commission Ledger Approver · Songa App |
 | **Driver Wallet Activity** | Unified ledger across DCL, Rental Days, Energy KWh | ↑ |
-| **Wallet Recharge Analytics** | Recharge volume, success rate, M-Pesa vs Commission *(+ chart)* | ↑ |
+| **Wallet Recharge Analytics** | Recharge volume, success rate, Commission / M-Pesa / M-Pesa C2B *(+ chart)* | ↑ |
 | **Songa STK Push Status** | M-Pesa Express Request scoped to wallet recharges | ↑ |
 | **Commission Ledger Status** | Approval queue by workflow state *(+ chart)* | ↑ |
 | **Asset Repair Analytics** | Repairs by severity, type, cost, downtime, stock *(+ trend chart)* | System Manager · Technical Agent · Songa App |
@@ -365,7 +384,7 @@ Same as `recharge_rental_days`, but use `kwh` *(float)* instead of `no_of_days`.
 |-------|:--------:|
 | `rental_day_id` / `energy_kwh_id` | ✅ |
 
-Cancels the wallet document and reverses linked commission ledger or M-Pesa request.
+Cancels the wallet document and reverses linked commission ledger, M-Pesa Express request, or C2B-linked Songa Journal Entry *(and clears C2B back-references)*.
 
 </details>
 
@@ -436,9 +455,15 @@ Whitelisted under `songa_mobility_phase_2.songa_app_integration.utils.utils`:
 | `get_overall_balance` | All three balances in one call |
 | `allocate_commission` | Post approved allocation *(Journal Entry)* |
 | `deduct_commission` | Post approved deduction |
-| `process_mpesa_express_request` | Complete wallet recharge after STK success |
+| `process_mpesa_express_request` | Complete wallet recharge after STK terminal status |
+| `retry_mpesa_wallet_processing` / `reset_mpesa_wallet_processing` | Desk retry / reset Abandoned Express wallet processing |
+| `search_mpesa_c2b_for_wallet_link` | Desk search for linkable C2B payments |
+| `link_mpesa_c2b_to_wallet` / `unlink_mpesa_c2b_from_wallet` | Desk link / unlink C2B ↔ wallet |
+| `process_mpesa_c2b_wallet_payment` | Complete C2B-linked wallet *(JE + webhook)* |
 | `get_linked_supplier` | Supplier for a customer |
 | `get_branch_and_cost_center_by_supplier` | Accounting dimensions for supplier |
+
+Webhook desk helpers live under `songa_mobility_phase_2.songa_app_integration.utils.songa_webhook` *(retry / abandon log)*.
 
 </details>
 
@@ -450,7 +475,8 @@ Whitelisted under `songa_mobility_phase_2.songa_app_integration.utils.utils`:
 
 | Schedule | Task |
 |----------|------|
-| Every minute | `process_pending_mpesa_express_requests` — polls in-progress M-Pesa requests and completes wallet recharges on payment success |
+| Every **5 minutes** | `process_pending_mpesa_express_requests` — picks terminal Express requests linked to wallets, posts Songa JE on Completed, syncs Failed, respects attempt / Abandoned caps |
+| Every **5 minutes** | `retry_failed_songa_webhooks` — retries Failed **Songa Webhook Log** rows *(max 5 attempts, then Abandoned)* |
 
 ### Document events
 
@@ -459,12 +485,13 @@ Whitelisted under `songa_mobility_phase_2.songa_app_integration.utils.utils`:
 | Driver Commission Ledger | `on_update` | Webhook + auto GL on approval |
 | Driver | `after_insert` | Supplier / transporter setup |
 | Asset Repair | `validate`, `on_update` | Validation + Songa sync |
-| Comment | `on_update` | Asset repair notifications |
-| Payment Entry | `on_submit` | Commission allocation from payments |
-| Journal Entry | `on_submit` | Linked ledger validation |
+| Comment | `on_update` | Asset repair comment webhook |
+| Payment Entry | `on_submit` | Lease / commission deduction webhook when applicable |
+| Journal Entry | `on_submit` | Lease payment JE → commission deduction webhook when applicable |
 | Purchase Invoice / Stock Entry | `validate` | Branch and cost-centre rules |
+| Mpesa C2B Payment Register | `validate`, `before_submit` | Suppress stock PE when Songa wallet-linked |
 
-Client scripts in `public/js/` extend Driver, Payment Entry, Sales/Purchase documents, Stock Entry, and Journal Entry forms.
+Client scripts in `public/js/` extend Driver, Mpesa Express Request, Rental Days / Energy KWh *(C2B link dialog)*, Payment Entry, Sales/Purchase documents, Stock Entry / Asset Repair, and Journal Entry forms.
 
 ---
 
@@ -472,10 +499,10 @@ Client scripts in `public/js/` extend Driver, Payment Entry, Sales/Purchase docu
 
 | Role | Use |
 |------|-----|
-| **Songa App** | API / integration user |
+| **Songa App** | API / integration user; broad wallet, Express, C2B, and repair access |
 | **Commission Ledger Approver** | Approve or reject commission ledger entries |
 
-Asset Repair workflow also uses **Technical Agent**, **Lead Technician**, **Hub Manager**, and **Stock User**.
+Asset Repair workflow also uses **Technical Agent**, **Lead Technician**, **Hub Manager**, and **Stock User**. Hub Manager also has desk access to M-Pesa C2B Payment Register for ops linking.
 
 ---
 
@@ -484,20 +511,26 @@ Asset Repair workflow also uses **Technical Agent**, **Lead Technician**, **Hub 
 ```
 songa_mobility_phase_2/
 ├── songa_mobility_phase_2/
-│   ├── hooks.py                          # doc_events, scheduler, fixtures, app_include_js
-│   ├── fixtures/                         # workflows, custom fields, roles, masters
-│   ├── public/js/                        # desk form scripts
-│   ├── services/workflow_handlers/       # commission ledger webhook handler
+│   ├── hooks.py                          # doc_events, scheduler, fixtures, doctype_js
+│   ├── patches.txt                       # Express / C2B wallet field patches
+│   ├── fixtures/                         # workflows, custom fields, roles, DocPerms, masters
+│   ├── public/js/                        # desk form scripts (Express, C2B link, branch/CC)
+│   ├── services/workflow_handlers/       # commission ledger workflow handler
 │   └── songa_app_integration/
 │       ├── api/api.py                    # Songa platform REST API
-│       ├── doctype/                      # app DocTypes
+│       ├── doctype/                      # app DocTypes (incl. Songa Webhook Log)
 │       ├── events/events.py              # document event handlers
+│       ├── patches/                      # migrate helpers for M-Pesa wallet fields
 │       ├── report/                       # six script reports
 │       ├── report_helpers.py             # shared wallet balance logic
 │       ├── number_card/                  # dashboard number cards
 │       ├── dashboard_chart/              # dashboard charts
 │       ├── songa_app_integration_dashboard/
-│       ├── utils/utils.py                # GL posting + balance helpers
+│       ├── utils/
+│       │   ├── utils.py                  # GL, Express/C2B wallet processing
+│       │   ├── wallet_status.py          # Rental Days / Energy KWh status rules
+│       │   ├── songa_webhook.py          # outbound webhook + log/retry
+│       │   └── tasks.py                  # cron: Express process + webhook retry
 │       └── workspace/songa_app_integration/
 └── README.md
 ```
