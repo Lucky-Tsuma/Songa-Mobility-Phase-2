@@ -333,11 +333,13 @@ Create a commission allocation ledger entry *(awaiting approval)*.
 | `no_of_days` | ✅ | Positive integer |
 | `payment_method` | ✅ | `"commission"`, `"mpesa"`, or `"mpesa_c2b"` |
 | `phone_number` | if mpesa | Kenyan mobile format |
+| `transaction_id` | if mpesa_c2b (optional) | M-Pesa C2B `transid`. When set, looks up an unprocessed matching C2B and completes the recharge in one request; if not found, returns an error |
 | `company` | — | |
 
 - **Commission** — validates balance, submits Rental Days, auto-approves Deduction ledger
 - **M-Pesa** — returns `"status": "pending"` with `mpesa_request`; wallet credits after STK push confirms
-- **M-Pesa C2B** — returns `"status": "pending"` with wallet id; link a C2B Payment Register on the desk form, then Complete
+- **M-Pesa C2B** (no `transaction_id`) — returns `"status": "pending"` with wallet id; link a C2B Payment Register on the desk form, then Complete
+- **M-Pesa C2B** (with `transaction_id`) — matches C2B by `transid` + amount, links, posts JE/webhook, returns `"status": "success"` with balances
 
 <br>
 

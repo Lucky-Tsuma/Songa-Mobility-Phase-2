@@ -8,9 +8,11 @@ from frappe.model.workflow import apply_workflow
 from ..utils.utils import (
 	_clear_c2b_wallet_backref,
 	deduct_commission,
+	find_eligible_c2b_by_transid,
 	get_commission_balance_by_driver,
 	get_energy_kwh_balance_by_driver,
 	get_rental_days_balance_by_driver,
+	link_and_complete_mpesa_c2b_recharge,
 )
 
 _songa_inbound_requests_logger = None
@@ -247,6 +249,7 @@ def recharge_rental_days():
 		no_of_days = data.get("no_of_days")
 		payment_method = data.get("payment_method")
 		phone_number = data.get("phone_number")
+		transaction_id = data.get("transaction_id")
 
 		mandatory_fields = ["driver_id", "amount", "no_of_days", "payment_method"]
 
@@ -260,6 +263,13 @@ def recharge_rental_days():
 			return {
 				"status": "error",
 				"message": "Invalid payment method. Must be 'commission', 'mpesa', or 'mpesa_c2b'",
+			}
+
+		if transaction_id and payment_method != "mpesa_c2b":
+			frappe.local.response["http_status_code"] = 400
+			return {
+				"status": "error",
+				"message": "transaction_id is only supported when payment_method is 'mpesa_c2b'",
 			}
 
 		account_settings_error = _validate_recharge_account_settings(
@@ -293,6 +303,14 @@ def recharge_rental_days():
 				"status": "error",
 				"message": "A valid positive number of days is required",
 			}
+
+		c2b_name = None
+		if payment_method == "mpesa_c2b" and transaction_id:
+			c2b_match = find_eligible_c2b_by_transid(transaction_id, amount)
+			if c2b_match["status"] == "error":
+				frappe.local.response["http_status_code"] = c2b_match.get("http_status_code", 400)
+				return {"status": "error", "message": c2b_match["message"]}
+			c2b_name = c2b_match["c2b_name"]
 
 		if payment_method == "commission":
 			# Lock the driver's commission ledger rows to prevent race conditions
@@ -391,6 +409,8 @@ def recharge_rental_days():
 
 			elif payment_method == "mpesa_c2b":
 				frappe.set_value("Rental Days", rental_days.name, "status", "In Progress")
+				if c2b_name:
+					link_and_complete_mpesa_c2b_recharge("Rental Days", rental_days.name, c2b_name)
 
 			frappe.db.commit()
 
@@ -407,6 +427,16 @@ def recharge_rental_days():
 			}
 
 		if payment_method == "mpesa_c2b":
+			if c2b_name:
+				return {
+					"status": "success",
+					"message": "Rental days recharged successfully via M-Pesa C2B",
+					"rental_day_id": rental_days.name,
+					"mpesa_c2b_payment_register": c2b_name,
+					"total_rental_days_balance": get_rental_days_balance_by_driver(driver_id=driver_id).get(
+						"total_rental_days", 0
+					),
+				}
 			return {
 				"status": "pending",
 				"message": (
@@ -444,6 +474,7 @@ def recharge_kwh():
 		kwh = data.get("kwh")
 		payment_method = data.get("payment_method")
 		phone_number = data.get("phone_number")
+		transaction_id = data.get("transaction_id")
 
 		mandatory_fields = ["driver_id", "amount", "kwh", "payment_method"]
 
@@ -457,6 +488,13 @@ def recharge_kwh():
 			return {
 				"status": "error",
 				"message": "Invalid payment method. Must be 'commission', 'mpesa', or 'mpesa_c2b'",
+			}
+
+		if transaction_id and payment_method != "mpesa_c2b":
+			frappe.local.response["http_status_code"] = 400
+			return {
+				"status": "error",
+				"message": "transaction_id is only supported when payment_method is 'mpesa_c2b'",
 			}
 
 		account_settings_error = _validate_recharge_account_settings(
@@ -490,6 +528,14 @@ def recharge_kwh():
 				"status": "error",
 				"message": "A valid positive kWh value is required",
 			}
+
+		c2b_name = None
+		if payment_method == "mpesa_c2b" and transaction_id:
+			c2b_match = find_eligible_c2b_by_transid(transaction_id, amount)
+			if c2b_match["status"] == "error":
+				frappe.local.response["http_status_code"] = c2b_match.get("http_status_code", 400)
+				return {"status": "error", "message": c2b_match["message"]}
+			c2b_name = c2b_match["c2b_name"]
 
 		if payment_method == "commission":
 			# Lock the driver's commission ledger rows to prevent race conditions
@@ -586,6 +632,8 @@ def recharge_kwh():
 
 			elif payment_method == "mpesa_c2b":
 				frappe.set_value("Energy KWh", energy_kwh.name, "status", "In Progress")
+				if c2b_name:
+					link_and_complete_mpesa_c2b_recharge("Energy KWh", energy_kwh.name, c2b_name)
 
 			frappe.db.commit()
 
@@ -601,6 +649,14 @@ def recharge_kwh():
 			}
 
 		if payment_method == "mpesa_c2b":
+			if c2b_name:
+				return {
+					"status": "success",
+					"message": "Energy kWh recharged successfully via M-Pesa C2B",
+					"energy_kwh_id": energy_kwh.name,
+					"mpesa_c2b_payment_register": c2b_name,
+					"kwh_balance": get_energy_kwh_balance_by_driver(driver_id=driver_id).get("total_kwh", 0),
+				}
 			return {
 				"status": "pending",
 				"message": (

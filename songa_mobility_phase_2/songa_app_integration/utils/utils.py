@@ -896,6 +896,74 @@ def _cancel_linked_c2b_payment_entry(c2b_doc):
 	pe.cancel()
 
 
+def find_eligible_c2b_by_transid(transid, amount):
+	"""
+	Find an unprocessed, unlinked C2B payment by exact transid.
+
+	Locks matching rows FOR UPDATE. Returns a result dict:
+	- success: {"status": "success", "c2b_name": ...}
+	- error: {"status": "error", "http_status_code": ..., "message": ...}
+	"""
+	if not transid:
+		return {
+			"status": "error",
+			"http_status_code": 400,
+			"message": "transaction_id is required",
+		}
+
+	rows = frappe.db.sql(
+		"""
+		SELECT
+			name,
+			transamount,
+			IFNULL(custom_songa_wallet_processed, 0) AS custom_songa_wallet_processed,
+			IFNULL(custom_songa_reference_name, '') AS custom_songa_reference_name
+		FROM `tabMpesa C2B Payment Register`
+		WHERE transid = %s
+		  AND docstatus < 2
+		ORDER BY creation DESC
+		FOR UPDATE
+		""",
+		(transid,),
+		as_dict=True,
+	)
+
+	if not rows:
+		return {
+			"status": "error",
+			"http_status_code": 404,
+			"message": f"No M-Pesa C2B payment found for transaction_id {transid}",
+		}
+
+	expected_amount = frappe.utils.flt(amount)
+	amount_matches = [row for row in rows if frappe.utils.flt(row.transamount) == expected_amount]
+	if not amount_matches:
+		found_amount = frappe.utils.flt(rows[0].transamount)
+		return {
+			"status": "error",
+			"http_status_code": 400,
+			"message": (
+				f"Amount mismatch: wallet amount is {expected_amount} but "
+				f"C2B transamount is {found_amount} for transaction_id {transid}."
+			),
+		}
+
+	for row in amount_matches:
+		if row.custom_songa_wallet_processed:
+			continue
+		if row.custom_songa_reference_name:
+			continue
+		return {"status": "success", "c2b_name": row.name}
+
+	return {
+		"status": "error",
+		"http_status_code": 400,
+		"message": (
+			f"M-Pesa C2B payment for transaction_id {transid} is already linked " "or wallet-processed."
+		),
+	}
+
+
 @frappe.whitelist(allow_guest=False)
 def search_mpesa_c2b_for_wallet_link(full_name=None, transid=None, amount=None, limit=20):
 	"""Search unlinked C2B payments eligible for Songa wallet linking."""
@@ -937,8 +1005,7 @@ def search_mpesa_c2b_for_wallet_link(full_name=None, transid=None, amount=None, 
 	return {"status": "success", "data": rows}
 
 
-@frappe.whitelist(allow_guest=False)
-def link_mpesa_c2b_to_wallet(wallet_doctype, wallet_name, c2b_name):
+def _link_mpesa_c2b_to_wallet(wallet_doctype, wallet_name, c2b_name, *, commit=True):
 	"""Link a C2B payment to a submitted In Progress wallet recharge."""
 	if wallet_doctype not in ("Rental Days", "Energy KWh"):
 		frappe.throw("C2B linking is only supported for Rental Days and Energy KWh.")
@@ -992,13 +1059,26 @@ def link_mpesa_c2b_to_wallet(wallet_doctype, wallet_name, c2b_name):
 		},
 		update_modified=False,
 	)
-	frappe.db.commit()
+	if commit:
+		frappe.db.commit()
 
 	return {
 		"status": "success",
 		"message": f"Linked C2B payment {c2b_name} to {wallet_doctype} {wallet_name}.",
 		"c2b_name": c2b_name,
 	}
+
+
+@frappe.whitelist(allow_guest=False)
+def link_mpesa_c2b_to_wallet(wallet_doctype, wallet_name, c2b_name):
+	"""Link a C2B payment to a submitted In Progress wallet recharge."""
+	return _link_mpesa_c2b_to_wallet(wallet_doctype, wallet_name, c2b_name, commit=True)
+
+
+def link_and_complete_mpesa_c2b_recharge(wallet_doctype, wallet_name, c2b_name):
+	"""Link a C2B payment and run the Songa wallet complete path (JE + webhook)."""
+	_link_mpesa_c2b_to_wallet(wallet_doctype, wallet_name, c2b_name, commit=False)
+	return process_mpesa_c2b_wallet_payment(wallet_doctype, wallet_name)
 
 
 @frappe.whitelist(allow_guest=False)
