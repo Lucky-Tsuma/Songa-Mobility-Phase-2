@@ -216,9 +216,13 @@ scheduler_events = {
 # Overriding Methods
 # ------------------------------
 #
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "songa_mobility_phase_2.event.get_events"
-# }
+# STK callbacks update Express status via db.set_value (no doc events). Override
+# the callback so Songa patches are applied and wallets process automatically.
+override_whitelisted_methods = {
+	"frappe_mpsa_payments.frappe_mpsa_payments.api.m_pesa_api.stk_push_callback": (
+		"songa_mobility_phase_2.songa_app_integration.overrides.mpesa_express.stk_push_callback"
+	),
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
@@ -238,12 +242,12 @@ scheduler_events = {
 
 # Request Events
 # ----------------
-# before_request = ["songa_mobility_phase_2.utils.before_request"]
+before_request = ["songa_mobility_phase_2.songa_app_integration.overrides.mpesa_express.apply_patches"]
 # after_request = ["songa_mobility_phase_2.utils.after_request"]
 
 # Job Events
 # ----------
-# before_job = ["songa_mobility_phase_2.utils.before_job"]
+before_job = ["songa_mobility_phase_2.songa_app_integration.overrides.mpesa_express.apply_patches"]
 # after_job = ["songa_mobility_phase_2.utils.after_job"]
 
 # User Data Protection
