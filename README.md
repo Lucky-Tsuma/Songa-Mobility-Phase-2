@@ -197,7 +197,7 @@ Custom fields and client scripts ship via fixtures for:
 <summary><strong>Click to expand full list</strong></summary>
 
 - **Driver** — supplier/transporter link for commission GL balance and M-Pesa JE party
-- **Mpesa Express Request** — Songa wallet processed / attempt / process status / journal entry fields; desk Process / Retry / Reset
+- **Mpesa Express Request** — Songa wallet processed / attempt / process status / journal entry fields; auto-process on STK callback; desk Process / Retry / Reset for Abandoned retries
 - **Mpesa C2B Payment Register** — Songa reference back-link, processed flag, journal entry; PE creation suppressed when wallet-linked
 - **Asset** / **Asset Repair** — Songa repair ID, asset/severity type, trike registration, workflow state
 - **Asset Repair Consumed Item** — UOM fetch on stock lines
@@ -475,8 +475,12 @@ Webhook desk helpers live under `songa_mobility_phase_2.songa_app_integration.ut
 
 | Schedule | Task |
 |----------|------|
-| Every **5 minutes** | `process_pending_mpesa_express_requests` — picks terminal Express requests linked to wallets, posts Songa JE on Completed, syncs Failed, respects attempt / Abandoned caps |
+| Every **5 minutes** | `process_pending_mpesa_express_requests` — safety net for terminal Express requests still Pending *(auto-process on STK callback is primary)*; posts Songa JE on Completed, syncs Failed, respects attempt / Abandoned caps |
 | Every **5 minutes** | `retry_failed_songa_webhooks` — retries Failed **Songa Webhook Log** rows *(max 5 attempts, then Abandoned)* |
+
+### M-Pesa Express auto-processing
+
+When an STK callback (or transaction-status query) sets **Mpesa Express Request** to `Completed` / `Failed`, Songa immediately runs `process_mpesa_express_request` for wallet-linked requests *(Rental Days / Energy KWh)*. This is required because mpsa writes status with `db.set_value` (no document events). Desk **Process Wallet** / **Retry** buttons remain for Abandoned or failed attempts.
 
 ### Document events
 
