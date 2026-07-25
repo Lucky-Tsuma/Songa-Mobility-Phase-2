@@ -120,6 +120,7 @@ def _create_supplier_contact(full_name, mobile_no=None):
 			"first_name": first,
 			"middle_name": middle,
 			"last_name": last,
+			"custom_country": "Kenya",
 			"is_primary_contact": 1,
 		}
 	)
