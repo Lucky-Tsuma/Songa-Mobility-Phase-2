@@ -103,6 +103,49 @@ def on_asset_repair_update(doc, method):
 		send_songa_webhook(payload, context="Asset Repair Completion")
 
 
+def _parse_party_name(full_name):
+	"""Split a full name into first / middle / last for Contact."""
+	from erpnext.selling.doctype.customer.customer import parse_full_name
+
+	first, middle, last = parse_full_name(full_name or "")
+	return first or full_name or "Contact", middle, last
+
+
+def _create_supplier_contact(full_name, mobile_no=None):
+	"""Create a basic Contact (no party links yet) for a new Supplier."""
+	first, middle, last = _parse_party_name(full_name)
+	contact = frappe.get_doc(
+		{
+			"doctype": "Contact",
+			"first_name": first,
+			"middle_name": middle,
+			"last_name": last,
+			"is_primary_contact": 1,
+		}
+	)
+	if mobile_no:
+		contact.append(
+			"phone_nos",
+			{
+				"phone": mobile_no,
+				"is_primary_mobile_no": 1,
+			},
+		)
+	contact.insert(ignore_permissions=True)
+	return contact
+
+
+def _link_contact_to_supplier(contact, supplier_name):
+	contact.append(
+		"links",
+		{
+			"link_doctype": "Supplier",
+			"link_name": supplier_name,
+		},
+	)
+	contact.save(ignore_permissions=True)
+
+
 def on_driver_insert(doc, method):
 	if not doc.custom_supplier_group:
 		frappe.log_error(
@@ -117,15 +160,20 @@ def on_driver_insert(doc, method):
 
 	try:
 		if not (doc.transporter and doc.customer):
+			contact = _create_supplier_contact(doc.full_name, mobile_no=doc.get("cell_number"))
+
 			supplier = frappe.get_doc(
 				{
 					"doctype": "Supplier",
 					"supplier_name": doc.full_name,
 					"supplier_type": "Individual",
 					"supplier_group": doc.custom_supplier_group,
+					"supplier_primary_contact": contact.name,
+					**({"mobile_no": doc.cell_number} if doc.get("cell_number") else {}),
 				}
 			)
-			supplier.save(ignore_permissions=True)
+			supplier.insert(ignore_permissions=True)
+			_link_contact_to_supplier(contact, supplier.name)
 
 			customer = frappe.get_doc(
 				{
@@ -134,7 +182,7 @@ def on_driver_insert(doc, method):
 					"customer_type": "Individual",
 				}
 			)
-			customer.save(ignore_permissions=True)
+			customer.insert(ignore_permissions=True)
 
 			doc.transporter = supplier.name
 			doc.customer = customer.name
@@ -166,7 +214,7 @@ def on_driver_insert(doc, method):
 					"secondary_role": "Customer",
 					"secondary_party": doc.customer,
 				}
-			).save(ignore_permissions=True)
+			).insert(ignore_permissions=True)
 
 	except Exception:
 		frappe.db.rollback()
