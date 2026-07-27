@@ -646,8 +646,6 @@ def post_mpesa_wallet_journal_entry(payment_doc, reference_doc):
 					"debit_in_account_currency": 0,
 					"credit_in_account_currency": amount,
 					"party_type": "Supplier",
-					"party": supplier,
-					**branch_cost_center_fields,
 					"is_advance": "No",
 				},
 			],
@@ -959,7 +957,7 @@ def find_eligible_c2b_by_transid(transid, amount):
 		"status": "error",
 		"http_status_code": 400,
 		"message": (
-			f"M-Pesa C2B payment for transaction_id {transid} is already linked " "or wallet-processed."
+			f"M-Pesa C2B payment for transaction_id {transid} is already linked or wallet-processed."
 		),
 	}
 
