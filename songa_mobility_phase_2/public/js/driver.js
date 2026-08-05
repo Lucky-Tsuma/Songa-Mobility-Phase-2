@@ -31,20 +31,29 @@ const getBalance = (frm) => {
 	});
 };
 
+let driverParentSupplierGroup = null;
+
+const loadDriverParentSupplierGroup = () => {
+	return frappe.db
+		.get_single_value("Songa Customization Settings", "driver_parent_supplier_group")
+		.then((value) => {
+			driverParentSupplierGroup = value;
+		});
+};
+
 const filterSongaDrivers = (frm) => {
 	frm.set_query("custom_supplier_group", function () {
-		return {
-			filters: {
-				parent_supplier_group: "Drivers / Collectors",
-				is_group: 0,
-			},
-		};
+		const filters = { is_group: 0 };
+		if (driverParentSupplierGroup) {
+			filters.parent_supplier_group = driverParentSupplierGroup;
+		}
+		return { filters };
 	});
 };
 
 frappe.ui.form.on("Driver", {
-	onload: function (frm) {
-		filterSongaDrivers(frm);
+	onload(frm) {
+		loadDriverParentSupplierGroup().then(() => filterSongaDrivers(frm));
 	},
 	refresh(frm) {
 		if (!frm.doc.__islocal) {
@@ -52,6 +61,10 @@ frappe.ui.form.on("Driver", {
 				return getBalance(frm);
 			});
 		}
-		filterSongaDrivers(frm);
+		if (!driverParentSupplierGroup) {
+			loadDriverParentSupplierGroup().then(() => filterSongaDrivers(frm));
+		} else {
+			filterSongaDrivers(frm);
+		}
 	},
 });

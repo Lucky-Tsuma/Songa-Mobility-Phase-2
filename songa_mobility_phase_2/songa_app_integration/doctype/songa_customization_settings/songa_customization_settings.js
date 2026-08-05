@@ -16,5 +16,11 @@ frappe.ui.form.on("Songa Customization Settings", {
 		]) {
 			frm.set_query(field, expenseAccountQuery);
 		}
+
+		frm.set_query("driver_parent_supplier_group", () => ({
+			filters: {
+				is_group: 1,
+			},
+		}));
 	},
 });

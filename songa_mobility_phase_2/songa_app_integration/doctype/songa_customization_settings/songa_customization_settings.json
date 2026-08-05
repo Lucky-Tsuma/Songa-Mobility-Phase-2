@@ -10,6 +10,7 @@
   "stk_push_payment_gateway",
   "column_break_lpcu",
   "songa_webhook_endpoint",
+  "driver_parent_supplier_group",
   "battery_swap_tab",
   "commission_battery_swap_section",
   "battery_swap_commission_debit",
@@ -44,7 +45,16 @@
  "fields": [
   {
    "fieldname": "driver_commission_accounts_section",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Driver & Commission"
+  },
+  {
+   "description": "Leaf supplier groups under this parent are offered on the Driver form (Supplier Group).",
+   "fieldname": "driver_parent_supplier_group",
+   "fieldtype": "Link",
+   "label": "Driver Parent Supplier Group",
+   "options": "Supplier Group",
+   "reqd": 1
   },
   {
    "fieldname": "column_break_lpcu",
@@ -244,7 +254,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-07-18 17:45:00.000000",
+ "modified": "2026-08-05 10:01:49.288656",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Songa Customization Settings",
