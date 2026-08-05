@@ -85,3 +85,33 @@ class TestMpesaExpressAutoProcess(unittest.TestCase):
 
 		original.assert_called_once()
 		auto_process.assert_not_called()
+
+	def test_wrapped_reconcile_uses_songa_path_for_payment_request(self):
+		original = MagicMock()
+		wrapped = mpesa_express._wrapped_handle_successful_transaction(original)
+		request_doc = MagicMock()
+		request_doc.get.side_effect = lambda key, default=None: (
+			"Payment Request" if key == "reference_doctype" else default
+		)
+		settings = MagicMock()
+
+		with patch.object(mpesa_express, "_handle_payment_request_successful_transaction") as songa_handler:
+			wrapped(request_doc, settings)
+
+		songa_handler.assert_called_once_with(request_doc, settings)
+		original.assert_not_called()
+
+	def test_wrapped_reconcile_delegates_non_payment_request(self):
+		original = MagicMock()
+		wrapped = mpesa_express._wrapped_handle_successful_transaction(original)
+		request_doc = MagicMock()
+		request_doc.get.side_effect = lambda key, default=None: (
+			"Rental Days" if key == "reference_doctype" else default
+		)
+		settings = MagicMock()
+
+		with patch.object(mpesa_express, "_handle_payment_request_successful_transaction") as songa_handler:
+			wrapped(request_doc, settings)
+
+		songa_handler.assert_not_called()
+		original.assert_called_once_with(request_doc, settings)

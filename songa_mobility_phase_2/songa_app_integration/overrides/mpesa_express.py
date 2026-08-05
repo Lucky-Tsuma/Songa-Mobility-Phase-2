@@ -4,6 +4,10 @@ frappe_mpsa_payments updates Express status via ``frappe.db.set_value``, which
 does not fire document events. Wallet processing is hooked from
 ``update_mpesa_request_status`` (callback + status query). The 5-minute cron
 remains a safety net for failed attempts and edge paths.
+
+Also patches ``handle_successful_transaction`` so Payment Request STK flows
+create a Payment Entry before Webshop's ``on_payment_authorized`` can zero
+outstanding via Phone-channel ``set_as_paid``.
 """
 
 from __future__ import annotations
@@ -61,8 +65,64 @@ def _wrapped_update_mpesa_request_status(original):
 	return update_mpesa_request_status
 
 
+def _handle_payment_request_successful_transaction(request_doc, settings):
+	"""Reconcile a completed Express request linked to a Payment Request.
+
+	Skips ``on_payment_authorized`` before Payment Entry creation. With Webshop
+	enabled, that hook calls ``set_as_paid()``; for ``payment_channel == "Phone"``
+	ERPNext only sets outstanding to 0 / status Paid and does not create a PE,
+	so the subsequent ``create_payment_entry()`` fails allocation validation.
+	"""
+	from frappe_mpsa_payments.utils.utils import (
+		log_and_throw_error,
+		set_mpesa_request_reconciled,
+	)
+
+	if "erpnext" not in frappe.get_installed_apps():
+		return
+
+	payment_request = frappe.get_doc("Payment Request", request_doc.reference_name)
+
+	if payment_request.reference_doctype == "Sales Invoice":
+		invoice = frappe.get_doc("Sales Invoice", payment_request.reference_name)
+		if invoice.docstatus == 0:
+			try:
+				invoice.submit()
+			except Exception:
+				log_and_throw_error("Payment Request Submission Error", request_doc.name)
+
+	try:
+		payment_request.create_payment_entry()
+	except Exception:
+		log_and_throw_error("Payment Entry Creation Error", request_doc.name)
+
+	try:
+		if settings.auto_create_sales_invoice and payment_request.reference_doctype == "Sales Order":
+			from erpnext.selling.doctype.sales_order.sales_order import make_sales_invoice
+
+			si = make_sales_invoice(payment_request.reference_name, ignore_permissions=True)
+			si.allocate_advances_automatically = True
+			si = si.insert(ignore_permissions=True)
+			si.submit()
+	except Exception:
+		log_and_throw_error("Sales Invoice Creation Error", request_doc.name)
+
+	frappe.db.set_value("Payment Request", payment_request.name, "status", "Paid")
+	set_mpesa_request_reconciled(request_doc)
+
+
+def _wrapped_handle_successful_transaction(original):
+	def handle_successful_transaction(request_doc, settings):
+		if request_doc.get("reference_doctype") == "Payment Request":
+			_handle_payment_request_successful_transaction(request_doc, settings)
+			return
+		return original(request_doc, settings)
+
+	return handle_successful_transaction
+
+
 def apply_patches() -> None:
-	"""Patch mpsa status writers so Songa wallets process on terminal status."""
+	"""Patch mpsa helpers used by STK callback / status query / reconcile."""
 	global _PATCHED
 	if _PATCHED:
 		return
@@ -72,27 +132,52 @@ def apply_patches() -> None:
 	except ImportError:
 		return
 
-	original = mpesa_utils.update_mpesa_request_status
-	if getattr(original, "_songa_wallet_patched", False):
+	status_original = mpesa_utils.update_mpesa_request_status
+	reconcile_original = mpesa_utils.handle_successful_transaction
+
+	already_status = getattr(status_original, "_songa_wallet_patched", False)
+	already_reconcile = getattr(reconcile_original, "_songa_pr_reconcile_patched", False)
+	if already_status and already_reconcile:
 		_PATCHED = True
 		return
 
-	wrapped = _wrapped_update_mpesa_request_status(original)
-	wrapped._songa_wallet_patched = True
-	mpesa_utils.update_mpesa_request_status = wrapped
+	if not already_status:
+		status_wrapped = _wrapped_update_mpesa_request_status(status_original)
+		status_wrapped._songa_wallet_patched = True
+		mpesa_utils.update_mpesa_request_status = status_wrapped
+	else:
+		status_wrapped = status_original
 
-	# Re-bind modules that imported the helper by name at import time.
+	if not already_reconcile:
+		reconcile_wrapped = _wrapped_handle_successful_transaction(reconcile_original)
+		reconcile_wrapped._songa_pr_reconcile_patched = True
+		mpesa_utils.handle_successful_transaction = reconcile_wrapped
+	else:
+		reconcile_wrapped = reconcile_original
+
+	# Re-bind modules that imported helpers by name at import time.
 	try:
 		from frappe_mpsa_payments.frappe_mpsa_payments.api import m_pesa_api
 
-		m_pesa_api.update_mpesa_request_status = wrapped
+		m_pesa_api.update_mpesa_request_status = status_wrapped
+		m_pesa_api.handle_successful_transaction = reconcile_wrapped
 	except Exception:
 		pass
 
 	try:
 		from frappe_mpsa_payments.frappe_mpsa_payments.api import mpesa_response_handler
 
-		mpesa_response_handler.update_mpesa_request_status = wrapped
+		mpesa_response_handler.update_mpesa_request_status = status_wrapped
+		mpesa_response_handler.handle_successful_transaction = reconcile_wrapped
+	except Exception:
+		pass
+
+	try:
+		from frappe_mpsa_payments.frappe_mpsa_payments.doctype.mpesa_express_request import (
+			mpesa_express_request,
+		)
+
+		mpesa_express_request.handle_successful_transaction = reconcile_wrapped
 	except Exception:
 		pass
 

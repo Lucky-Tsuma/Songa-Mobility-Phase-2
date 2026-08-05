@@ -214,7 +214,8 @@ scheduler_events = {
 # ------------------------------
 #
 # STK callbacks update Express status via db.set_value (no doc events). Override
-# the callback so Songa patches are applied and wallets process automatically.
+# the callback so Songa patches are applied: wallet auto-process, and Payment
+# Request reconcile that creates PE before Webshop zeros outstanding.
 override_whitelisted_methods = {
 	"frappe_mpsa_payments.frappe_mpsa_payments.api.m_pesa_api.stk_push_callback": (
 		"songa_mobility_phase_2.songa_app_integration.overrides.mpesa_express.stk_push_callback"
