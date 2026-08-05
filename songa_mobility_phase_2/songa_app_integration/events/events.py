@@ -189,34 +189,6 @@ def on_driver_insert(doc, method):
 			doc.customer = customer.name
 			doc.save(ignore_permissions=True)
 
-		party_link_exists = frappe.db.exists(
-			"Party Link",
-			{
-				"primary_role": "Supplier",
-				"primary_party": doc.transporter,
-				"secondary_role": "Customer",
-				"secondary_party": doc.customer,
-			},
-		) or frappe.db.exists(
-			"Party Link",
-			{
-				"primary_role": "Customer",
-				"primary_party": doc.customer,
-				"secondary_role": "Supplier",
-				"secondary_party": doc.transporter,
-			},
-		)
-		if not party_link_exists:
-			frappe.get_doc(
-				{
-					"doctype": "Party Link",
-					"primary_role": "Supplier",
-					"primary_party": doc.transporter,
-					"secondary_role": "Customer",
-					"secondary_party": doc.customer,
-				}
-			).insert(ignore_permissions=True)
-
 	except Exception:
 		frappe.db.rollback()
 		frappe.log_error(frappe.get_traceback(), "Driver Insert Failed")
