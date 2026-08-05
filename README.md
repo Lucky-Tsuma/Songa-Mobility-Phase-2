@@ -196,19 +196,26 @@ Custom fields and client scripts ship via fixtures for:
 <details>
 <summary><strong>Click to expand full list</strong></summary>
 
-- **Driver** — supplier/transporter link for commission GL balance and M-Pesa JE party
+- **Driver** — supplier/transporter link for commission GL balance; branch/cost center on M-Pesa wallet JE debit row
 - **Mpesa Express Request** — Songa wallet processed / attempt / process status / journal entry fields; auto-process on STK callback; desk Process / Retry / Reset for Abandoned retries
 - **Mpesa C2B Payment Register** — Songa reference back-link, processed flag, journal entry; PE creation suppressed when wallet-linked
 - **Asset** / **Asset Repair** — Songa repair ID, asset/severity type, trike registration, workflow state
 - **Asset Repair Consumed Item** — UOM fetch on stock lines
 - **Payment Entry**, **Journal Entry**, **Purchase Invoice**, **Purchase Order**, **Sales Invoice**, **Stock Entry** — branch/cost-centre and accounting hooks
-- **Supplier** *(+ group)* — branch / cost center used on wallet JEs
+- **Supplier** *(+ group)* — branch / cost center on wallet JE debit row (from `Driver.transporter`)
 
 </details>
 
 ### M-Pesa wallet accounting
 
-When an Express or C2B wallet recharge completes, Songa posts a **Journal Entry** using the M-Pesa debit/credit accounts from settings. The driver's **Supplier** (`Driver.transporter`) is set as party on the **credit** row. Linked C2B payments skip the stock Customer Payment Entry path so finance is not double-posted.
+When an Express or C2B wallet recharge completes, Songa posts a **Journal Entry** using the M-Pesa debit/credit accounts from settings:
+
+| Row | Account | Dimensions / party |
+|-----|---------|-------------------|
+| **Debit** | M-Pesa debit account (rental or battery swap) | Branch and cost center from the driver's Supplier (`Driver.transporter`) |
+| **Credit** | M-Pesa credit account | No party link — `party_type` may be `Supplier` without a `party` value |
+
+Linked C2B payments skip the stock Customer Payment Entry path so finance is not double-posted.
 
 ---
 
@@ -235,7 +242,7 @@ stateDiagram-v2
 
 > On **Approved** or **Rejected**, a webhook POSTs to the URL in Songa Customization Settings with driver ID, amount, updated balances, and ledger reference.
 >
-> Commission-funded wallet recharges auto-create a Deduction entry and approve it immediately after the linked recharge is submitted.
+> **Allocation** and **Deduction** ledgers both require **Commission Ledger Approver** approval before the Journal Entry is posted. Commission-funded wallet recharges return `pending` from the API until the linked Deduction is approved; on **Rejected**, the wallet recharge is marked **Failed**.
 
 ---
 
@@ -355,7 +362,7 @@ Create a commission allocation ledger entry *(awaiting approval)*.
 | `transaction_id` | if mpesa_c2b (optional) | M-Pesa C2B `transid`. When set, looks up an unprocessed matching C2B and completes the recharge in one request; if not found, returns an error |
 | `company` | — | |
 
-- **Commission** — validates balance, submits Rental Days, auto-approves Deduction ledger
+- **Commission** — validates balance, submits wallet, creates Deduction ledger *(Pending)*, links wallet as **In Progress**; completes on approver **Approve**
 - **M-Pesa** — returns `"status": "pending"` with `mpesa_request`; wallet credits after STK push confirms
 - **M-Pesa C2B** (no `transaction_id`) — returns `"status": "pending"` with wallet id; link a C2B Payment Register on the desk form, then Complete
 - **M-Pesa C2B** (with `transaction_id`) — matches C2B by `transid` + amount, links, posts JE/webhook, returns `"status": "success"` with balances

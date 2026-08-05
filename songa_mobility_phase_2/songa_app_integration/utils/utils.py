@@ -273,6 +273,22 @@ def deduct_commission(
 ):
 	try:
 		driver_commission_ledger = frappe.get_doc("Driver Commission Ledger", driver_commission_ledger_name)
+
+		if driver_commission_ledger.transaction_type != "Deduction":
+			frappe.throw("Commission deduction is only supported for Deduction ledgers.")
+
+		if driver_commission_ledger.journal_entry:
+			return {
+				"status": "success",
+				"message": "Commission already deducted.",
+				"data": driver_commission_ledger.journal_entry,
+			}
+
+		if driver_commission_ledger.workflow_state != "Approved":
+			frappe.throw(
+				"Driver Commission Ledger must be Approved before posting the deduction Journal Entry."
+			)
+
 		driver = driver_commission_ledger.driver
 		supplier = frappe.db.get_value("Driver", driver, "transporter")
 		amount = driver_commission_ledger.amount
@@ -844,13 +860,17 @@ def process_mpesa_express_request(doc):
 				}
 
 				if reference_doctype == "Rental Days":
-					payload["rental_days_balance"] = get_rental_days_balance_by_driver(
-						driver_id=reference_doc.driver
-					)
+					rental_balance = get_rental_days_balance_by_driver(driver_id=reference_doc.driver)
+					if rental_balance.get("status") == "success":
+						payload["rental_days_balance"] = rental_balance.get("total_rental_days", 0)
+					payload["rental_day_id"] = reference_doc.name
+					payload["no_of_days"] = reference_doc.no_of_days
 				elif reference_doctype == "Energy KWh":
-					payload["energy_kwh_balance"] = get_energy_kwh_balance_by_driver(
-						driver_id=reference_doc.driver
-					)
+					energy_balance = get_energy_kwh_balance_by_driver(driver_id=reference_doc.driver)
+					if energy_balance.get("status") == "success":
+						payload["energy_kwh_balance"] = energy_balance.get("total_kwh", 0)
+					payload["energy_kwh_id"] = reference_doc.name
+					payload["kwh"] = reference_doc.energy_qty
 
 				send_songa_webhook(payload, context="Mpesa Express Request")
 		else:
@@ -1166,9 +1186,17 @@ def process_mpesa_c2b_wallet_payment(wallet_doctype, wallet_name):
 				"action_type": _mpesa_wallet_action_type(wallet_doctype),
 			}
 			if wallet_doctype == "Rental Days":
-				payload["rental_days_balance"] = get_rental_days_balance_by_driver(driver_id=wallet.driver)
+				rental_balance = get_rental_days_balance_by_driver(driver_id=wallet.driver)
+				if rental_balance.get("status") == "success":
+					payload["rental_days_balance"] = rental_balance.get("total_rental_days", 0)
+				payload["rental_day_id"] = wallet.name
+				payload["no_of_days"] = wallet.no_of_days
 			elif wallet_doctype == "Energy KWh":
-				payload["energy_kwh_balance"] = get_energy_kwh_balance_by_driver(driver_id=wallet.driver)
+				energy_balance = get_energy_kwh_balance_by_driver(driver_id=wallet.driver)
+				if energy_balance.get("status") == "success":
+					payload["energy_kwh_balance"] = energy_balance.get("total_kwh", 0)
+				payload["energy_kwh_id"] = wallet.name
+				payload["kwh"] = wallet.energy_qty
 			send_songa_webhook(payload, context="Mpesa C2B Payment Register")
 
 		_mark_mpesa_wallet_processed(c2b.name, source_doctype="Mpesa C2B Payment Register")

@@ -7,7 +7,6 @@ from frappe.model.workflow import apply_workflow
 
 from ..utils.utils import (
 	_clear_c2b_wallet_backref,
-	deduct_commission,
 	find_eligible_c2b_by_transid,
 	get_commission_balance_by_driver,
 	get_energy_kwh_balance_by_driver,
@@ -120,23 +119,30 @@ def _validate_asset_repair_actor(user_email, asset_repair_name):
 	_validate_songa_actor(user_email, required_roles)
 
 
-def _approve_commission_ledger_workflow(ledger_name):
-	doc = frappe.get_doc("Driver Commission Ledger", ledger_name)
-	if doc.workflow_state == "Pending" and doc.transaction_type == "Deduction":
-		apply_workflow(doc, "Approve")
-
-
-def _complete_commission_deduction(ledger_name, rental_days_name=None, energy_kwh_name=None):
-	"""Post commission deduction JE and approve the ledger; completes the wallet recharge."""
-	result = deduct_commission(
-		ledger_name,
-		rental_days_name,
-		energy_kwh_name,
-		commit=False,
+def _link_commission_deduction_to_wallet(ledger_name, wallet_doctype, wallet_name):
+	"""Link a pending Deduction ledger to a submitted wallet recharge (In Progress)."""
+	frappe.db.set_value(
+		wallet_doctype,
+		wallet_name,
+		{
+			"driver_commission_ledger": ledger_name,
+			"status": "In Progress",
+		},
+		update_modified=True,
 	)
-	if isinstance(result, dict) and result.get("status") == "error":
-		frappe.throw(result.get("message"))
-	_approve_commission_ledger_workflow(ledger_name)
+
+
+def _create_commission_deduction_ledger(driver, amount, usage, company=None):
+	return frappe.get_doc(
+		{
+			"doctype": "Driver Commission Ledger",
+			"company": company or frappe.defaults.get_user_default("company"),
+			"driver": driver,
+			"amount": amount,
+			"usage": usage,
+			"transaction_type": "Deduction",
+		}
+	)
 
 
 RECHARGE_ACCOUNT_FIELDS = {
@@ -363,21 +369,17 @@ def recharge_rental_days():
 			rental_days.submit()
 
 			if payment_method == "commission":
-				driver_commission_ledger = frappe.get_doc(
-					{
-						"doctype": "Driver Commission Ledger",
-						"company": company or frappe.defaults.get_user_default("company"),
-						"driver": driver,
-						"amount": amount,
-						"usage": "Rental days recharge",
-						"transaction_type": "Deduction",
-					}
+				driver_commission_ledger = _create_commission_deduction_ledger(
+					driver,
+					amount,
+					"Rental days recharge",
+					company=company,
 				)
 				driver_commission_ledger.insert()
-
-				_complete_commission_deduction(
+				_link_commission_deduction_to_wallet(
 					driver_commission_ledger.name,
-					rental_days_name=rental_days.name,
+					"Rental Days",
+					rental_days.name,
 				)
 
 			elif payment_method == "mpesa":
@@ -446,14 +448,16 @@ def recharge_rental_days():
 				"rental_day_id": rental_days.name,
 			}
 
-		return {
-			"status": "success",
-			"message": "Rental days recharged successfully",
-			"commission_ledger": driver_commission_ledger.name,
-			"total_rental_days_balance": get_rental_days_balance_by_driver(driver_id=driver_id).get(
-				"total_rental_days", 0
-			),
-		}
+		if payment_method == "commission":
+			return {
+				"status": "pending",
+				"message": (
+					"Commission deduction created. Rental days will be recharged once "
+					"the deduction is approved."
+				),
+				"rental_day_id": rental_days.name,
+				"commission_ledger": driver_commission_ledger.name,
+			}
 
 	except Exception as e:
 		frappe.local.response["http_status_code"] = 500
@@ -588,21 +592,17 @@ def recharge_kwh():
 			energy_kwh.submit()
 
 			if payment_method == "commission":
-				driver_commission_ledger = frappe.get_doc(
-					{
-						"doctype": "Driver Commission Ledger",
-						"company": company or frappe.defaults.get_user_default("company"),
-						"driver": driver,
-						"amount": amount,
-						"usage": "Energy recharge",
-						"transaction_type": "Deduction",
-					}
+				driver_commission_ledger = _create_commission_deduction_ledger(
+					driver,
+					amount,
+					"Energy recharge",
+					company=company,
 				)
 				driver_commission_ledger.insert()
-
-				_complete_commission_deduction(
+				_link_commission_deduction_to_wallet(
 					driver_commission_ledger.name,
-					energy_kwh_name=energy_kwh.name,
+					"Energy KWh",
+					energy_kwh.name,
 				)
 
 			elif payment_method == "mpesa":
@@ -666,12 +666,16 @@ def recharge_kwh():
 				"energy_kwh_id": energy_kwh.name,
 			}
 
-		return {
-			"status": "success",
-			"message": "Energy kWh recharged successfully",
-			"commission_ledger": driver_commission_ledger.name,
-			"kwh_balance": get_energy_kwh_balance_by_driver(driver_id=driver_id).get("total_kwh", 0),
-		}
+		if payment_method == "commission":
+			return {
+				"status": "pending",
+				"message": (
+					"Commission deduction created. Energy KWh will be recharged once "
+					"the deduction is approved."
+				),
+				"energy_kwh_id": energy_kwh.name,
+				"commission_ledger": driver_commission_ledger.name,
+			}
 
 	except Exception as e:
 		frappe.local.response["http_status_code"] = 500
@@ -863,13 +867,15 @@ def _cancel_document(doctype, document_id, id_field):
 			driver_commission_ledger = frappe.get_doc(
 				"Driver Commission Ledger", doc.driver_commission_ledger
 			)
-			journal_entry = frappe.get_doc("Journal Entry", driver_commission_ledger.journal_entry)
+			if driver_commission_ledger.journal_entry:
+				if driver_commission_ledger.workflow_state == "Approved":
+					apply_workflow(driver_commission_ledger, "Cancel")
 
-			if driver_commission_ledger.workflow_state == "Approved":
-				apply_workflow(driver_commission_ledger, "Cancel")
-
-			journal_entry.flags.ignore_links = True
-			journal_entry.cancel()
+				journal_entry = frappe.get_doc("Journal Entry", driver_commission_ledger.journal_entry)
+				journal_entry.flags.ignore_links = True
+				journal_entry.cancel()
+			elif driver_commission_ledger.workflow_state == "Pending":
+				apply_workflow(driver_commission_ledger, "Reject")
 		elif doc.mpesa_express_request:
 			mpesa_express_request = frappe.get_doc("Mpesa Express Request", doc.mpesa_express_request)
 			mpesa_express_request.flags.ignore_links = True

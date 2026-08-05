@@ -10,6 +10,75 @@ from songa_mobility_phase_2.songa_app_integration.utils.utils import (
 TRIGGERED_STATES = {"Approved", "Rejected"}
 
 
+def _get_linked_wallet_recharge(doc):
+	"""Return wallet recharge metadata linked to a commission Deduction ledger."""
+	wallet = frappe.db.get_value(
+		"Rental Days",
+		{"driver_commission_ledger": doc.name},
+		["name", "no_of_days", "amount", "status"],
+		as_dict=True,
+	)
+	if wallet:
+		return {
+			"rental_day_id": wallet.name,
+			"no_of_days": wallet.no_of_days,
+			"wallet_amount": wallet.amount,
+			"wallet_status": wallet.status,
+		}
+
+	wallet = frappe.db.get_value(
+		"Energy KWh",
+		{"driver_commission_ledger": doc.name},
+		["name", "energy_qty", "amount", "status"],
+		as_dict=True,
+	)
+	if wallet:
+		return {
+			"energy_kwh_id": wallet.name,
+			"kwh": wallet.energy_qty,
+			"wallet_amount": wallet.amount,
+			"wallet_status": wallet.status,
+		}
+
+	return {}
+
+
+def _wallet_balance_fields(driver_id, usage):
+	"""Scalar wallet balances for Songa webhooks (matches post-recharge API shape)."""
+	fields = {}
+	if usage == "Rental days recharge":
+		result = get_rental_days_balance_by_driver(driver_id=driver_id)
+		if result.get("status") == "success":
+			fields["rental_days_balance"] = result.get("total_rental_days", 0)
+	elif usage == "Energy recharge":
+		result = get_energy_kwh_balance_by_driver(driver_id=driver_id)
+		if result.get("status") == "success":
+			fields["energy_kwh_balance"] = result.get("total_kwh", 0)
+	return fields
+
+
+def _fail_linked_wallet_recharge(doc):
+	"""Mark a linked wallet recharge Failed when a Deduction ledger is rejected."""
+	if doc.transaction_type != "Deduction":
+		return
+
+	for wallet_doctype in ("Rental Days", "Energy KWh"):
+		wallet_name = frappe.db.get_value(
+			wallet_doctype,
+			{"driver_commission_ledger": doc.name, "status": "In Progress"},
+			"name",
+		)
+		if wallet_name:
+			frappe.db.set_value(
+				wallet_doctype,
+				wallet_name,
+				"status",
+				"Failed",
+				update_modified=True,
+			)
+			return
+
+
 def _post_deduction_if_needed(doc):
 	if doc.transaction_type == "Deduction" and doc.workflow_state == "Approved" and not doc.journal_entry:
 		from songa_mobility_phase_2.songa_app_integration.utils.utils import (
@@ -34,6 +103,8 @@ def _post_allocation_if_needed(doc):
 
 def handle_commission_ledger_workflow(doc, method):
 	if doc.has_value_changed("workflow_state"):
+		if doc.workflow_state == "Rejected":
+			_fail_linked_wallet_recharge(doc)
 		_post_deduction_if_needed(doc)
 		_post_allocation_if_needed(doc)
 
@@ -46,6 +117,7 @@ def handle_commission_ledger_workflow(doc, method):
 			"transaction_type": doc.transaction_type,
 			"amount": doc.amount,
 			"commission_ledger": doc.name,
+			"workflow_state": doc.workflow_state,
 		}
 
 		commission_balance = get_commission_balance_by_driver(driver_id=doc.driver)
@@ -54,11 +126,8 @@ def handle_commission_ledger_workflow(doc, method):
 		if doc.transaction_type == "Deduction":
 			usage = doc.usage
 			payload["action_type"] = usage
-
-			if usage == "Energy recharge":
-				payload["energy_kwh_balance"] = get_energy_kwh_balance_by_driver(driver_id=doc.driver)
-			elif usage == "Rental days recharge":
-				payload["rental_days_balance"] = get_rental_days_balance_by_driver(driver_id=doc.driver)
+			payload.update(_get_linked_wallet_recharge(doc))
+			payload.update(_wallet_balance_fields(doc.driver, usage))
 		elif doc.transaction_type == "Allocation":
 			payload["action_type"] = "Approved Commission"
 		else:
