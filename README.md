@@ -36,6 +36,7 @@ Driver wallets · M-Pesa recharges · Commission approvals · Asset maintenance
 - [Workflows](#workflows)
 - [Reports & dashboards](#reports--dashboards)
 - [API reference](#api-reference)
+- [Outbound webhook reference](#outbound-webhook-reference)
 - [Background jobs & hooks](#background-jobs--hooks)
 - [Roles](#roles)
 - [Project layout](#project-layout)
@@ -446,6 +447,191 @@ Returns repair details, workflow state, costs, and stock items if consumed.
 | `user_email` | ✅ | |
 
 </details>
+
+## Outbound webhook reference
+
+> Outbound callbacks to Songa are sent by `send_songa_webhook(payload, context=...)` in `songa_app_integration/utils/songa_webhook.py`.
+
+### Endpoint & method
+
+- Target URL is read from **Songa Customization Settings** → `songa_webhook_endpoint`
+- HTTP method: `POST`
+- Content type: JSON body
+- Timeout: `10s`
+
+### Required payload contract
+
+- `action_type` is required; payloads without it are rejected and logged as failed
+- For best traceability in **Songa Webhook Log**, include one canonical reference key:
+  - `payment_entry`
+  - `journal_entry`
+  - `commission_ledger`
+  - `asset_repair`
+  - `mpesa_express_request`
+  - `mpesa_c2b_payment_register`
+
+### Trigger matrix
+
+| Trigger | Context | Typical `action_type` | Core payload fields |
+|--------|---------|------------------------|---------------------|
+| Driver Commission Ledger state change | `Commission Ledger Workflow` | `Approved Commission` / `Rental days recharge` / `Energy recharge` | `driver_id`, `commission_ledger`, `amount`, `commission_balance`, wallet ids (`rental_day_id` / `energy_kwh_id`), quantities (`no_of_days` / `kwh`), wallet balances |
+| Rental/Energy recharge via M-Pesa Express terminal completion | `Mpesa Express Request` | `Rental days recharge` / `Energy recharge` | `driver_id`, `mpesa_express_request`, `amount`, wallet id + quantity, updated wallet balance |
+| Rental/Energy recharge via linked M-Pesa C2B completion | `Mpesa C2B Payment Register` | `Rental days recharge` / `Energy recharge` | `driver_id`, `mpesa_c2b_payment_register`, `amount`, wallet id + quantity, updated wallet balance |
+| Asset Repair comment sync | `Asset Repair Comment` | `asset_repair_comment` | `asset_repair`, `comment`, `driver_id` when available |
+| Asset Repair completion/cancel sync | `Asset Repair Completion` | `Service Completed` / `Service Cancelled` | `asset_repair`, repair metadata, status fields |
+| Lease/commission accounting event hooks | `Commission Deduction Webhook` and related contexts | Varies by event | `payment_entry` or `journal_entry`, amount, driver/commission linkage |
+
+### Example JSON payloads
+
+> The examples below are representative payload shapes emitted by current handlers. Values are illustrative.
+
+#### 1) Commission workflow — Deduction approved (Rental days recharge)
+
+```json
+{
+  "driver_id": "DRI-0001",
+  "transaction_type": "Deduction",
+  "amount": 1200.0,
+  "commission_ledger": "COM-LEG-2026-00042",
+  "workflow_state": "Approved",
+  "commission_balance": 3800.0,
+  "action_type": "Rental days recharge",
+  "rental_day_id": "RD-2026-00021",
+  "no_of_days": 3,
+  "wallet_amount": 1200.0,
+  "wallet_status": "Completed",
+  "rental_days_balance": 9
+}
+```
+
+#### 2) Commission workflow — Deduction approved (Energy recharge)
+
+```json
+{
+  "driver_id": "DRI-0001",
+  "transaction_type": "Deduction",
+  "amount": 900.0,
+  "commission_ledger": "COM-LEG-2026-00043",
+  "workflow_state": "Approved",
+  "commission_balance": 2900.0,
+  "action_type": "Energy recharge",
+  "energy_kwh_id": "EKWH-2026-00018",
+  "kwh": 15.5,
+  "wallet_amount": 900.0,
+  "wallet_status": "Completed",
+  "energy_kwh_balance": 47.5
+}
+```
+
+#### 3) M-Pesa Express recharge completion
+
+```json
+{
+  "driver_id": "DRI-0001",
+  "transaction_type": "Recharge",
+  "amount": 1200.0,
+  "mpesa_express_request": "MER-00045",
+  "action_type": "Rental days recharge",
+  "rental_day_id": "RD-2026-00022",
+  "no_of_days": 3,
+  "rental_days_balance": 12
+}
+```
+
+#### 4) M-Pesa C2B linked recharge completion
+
+```json
+{
+  "driver_id": "DRI-0001",
+  "transaction_type": "Recharge",
+  "amount": 900.0,
+  "mpesa_c2b_payment_register": "C2B-00088",
+  "action_type": "Energy recharge",
+  "energy_kwh_id": "EKWH-2026-00019",
+  "kwh": 15.5,
+  "energy_kwh_balance": 63.0
+}
+```
+
+#### 5) Asset Repair comment webhook
+
+```json
+{
+  "action_type": "asset_repair_comment",
+  "asset_repair": "AR-2026-00007",
+  "asset_repair_id": "SR-REPAIR-9011",
+  "comment": "Battery cage bracket replaced.",
+  "comment_owner": "tech.agent@example.com",
+  "comment_timestamp": "2026-08-05 12:20:10.123456"
+}
+```
+
+#### 6) Asset Repair completion webhook
+
+```json
+{
+  "action_type": "Service Completed",
+  "asset_repair_id": "SR-REPAIR-9011",
+  "asset": "AST-TRIKE-0041",
+  "asset_name": "Trike 41",
+  "asset_type": "TRIKE",
+  "severity_type": "SERIOUS",
+  "failure_date": "2026-08-03 10:25:00",
+  "completion_date": "2026-08-05 12:10:00",
+  "repair_status": "Completed",
+  "workflow_state": "Completed",
+  "stock_consumption": 1,
+  "total_repair_cost": 1850.0,
+  "description": "Rear brake assembly failure",
+  "actions_performed": "Replaced brake pads and cable",
+  "stock_items": [
+    {
+      "item_code": "BRAKE-PAD-SET",
+      "warehouse": "Main Stores - C",
+      "valuation_rate": 450.0,
+      "uom": "Nos",
+      "consumed_quantity": 2,
+      "total_value": 900.0
+    }
+  ]
+}
+```
+
+#### 7) Lease / commission accounting hook (Payment Entry example)
+
+```json
+{
+  "action_type": "Commission Deduction",
+  "driver_id": "DRI-0001",
+  "commission_balance": 2650.0,
+  "payment_entry": "ACC-PAY-2026-00109",
+  "amount": 1500.0
+}
+```
+
+### Delivery outcomes & logging
+
+- **Success (HTTP 200):**
+  - writes success entry to the `songa_webhook_log` file logger
+  - returns `True` to caller
+- **Failure (network error or non-200):**
+  - writes to Error Log
+  - creates/updates a **Songa Webhook Log** row with status `Failed`
+  - increments `attempt_count`, stores endpoint/http status/response/error
+  - returns `False` to caller
+
+### Retry and abandonment lifecycle
+
+- Desk retry: `retry_songa_webhook_log_from_desk`
+- Desk abandon: `abandon_songa_webhook_log`
+- Scheduled retry: `retry_failed_songa_webhooks` every 5 minutes
+- Max retries: `5` attempts, then status moves to `Abandoned`
+- Retry success marks row `Sent` and sets `resolved_on`
+
+### Operational notes
+
+- Use stable `action_type` values and canonical reference keys so retries/dedupe target the right business event.
+- Webhook payloads include **post-state** wallet balances for recharge completion actions (commission-approved deduction, Express complete, C2B complete).
 
 <details>
 <summary><strong>🛠 Internal / desk utility methods</strong></summary>
