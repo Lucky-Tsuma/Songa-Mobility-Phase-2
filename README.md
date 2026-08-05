@@ -428,16 +428,6 @@ Returns repair details, workflow state, costs, and stock items if consumed.
 
 <br>
 
-#### `comment_on_asset_repair`
-
-| Field | Required |
-|-------|:--------:|
-| `asset_repair_id` | ✅ |
-| `comment` | ✅ |
-| `user_email` | ✅ |
-
-<br>
-
 #### `update_asset_repair`
 
 | Field | Required | Description |
@@ -477,7 +467,6 @@ Returns repair details, workflow state, costs, and stock items if consumed.
 | Driver Commission Ledger state change | `Commission Ledger Workflow` | `Approved Commission` / `Rental days recharge` / `Energy recharge` | `driver_id`, `commission_ledger`, `amount`, `commission_balance`, wallet ids (`rental_day_id` / `energy_kwh_id`), quantities (`no_of_days` / `kwh`), wallet balances |
 | Rental/Energy recharge via M-Pesa Express terminal completion | `Mpesa Express Request` | `Rental days recharge` / `Energy recharge` | `driver_id`, `mpesa_express_request`, `amount`, wallet id + quantity, updated wallet balance |
 | Rental/Energy recharge via linked M-Pesa C2B completion | `Mpesa C2B Payment Register` | `Rental days recharge` / `Energy recharge` | `driver_id`, `mpesa_c2b_payment_register`, `amount`, wallet id + quantity, updated wallet balance |
-| Asset Repair comment sync | `Asset Repair Comment` | `asset_repair_comment` | `asset_repair`, `comment`, `driver_id` when available |
 | Asset Repair completion/cancel sync | `Asset Repair Completion` | `Service Completed` / `Service Cancelled` | `asset_repair`, repair metadata, status fields |
 | Lease/commission accounting event hooks | `Commission Deduction Webhook` and related contexts | Varies by event | `payment_entry` or `journal_entry`, amount, driver/commission linkage |
 
@@ -553,20 +542,7 @@ Returns repair details, workflow state, costs, and stock items if consumed.
 }
 ```
 
-#### 5) Asset Repair comment webhook
-
-```json
-{
-  "action_type": "asset_repair_comment",
-  "asset_repair": "AR-2026-00007",
-  "asset_repair_id": "SR-REPAIR-9011",
-  "comment": "Battery cage bracket replaced.",
-  "comment_owner": "tech.agent@example.com",
-  "comment_timestamp": "2026-08-05 12:20:10.123456"
-}
-```
-
-#### 6) Asset Repair completion webhook
+#### 5) Asset Repair completion webhook
 
 ```json
 {
@@ -597,7 +573,7 @@ Returns repair details, workflow state, costs, and stock items if consumed.
 }
 ```
 
-#### 7) Lease / commission accounting hook (Payment Entry example)
+#### 6) Lease / commission accounting hook (Payment Entry example)
 
 ```json
 {
@@ -682,7 +658,6 @@ When an STK callback (or transaction-status query) sets **Mpesa Express Request*
 | Driver Commission Ledger | `on_update` | Webhook + auto GL on approval |
 | Driver | `after_insert` | Supplier / transporter setup |
 | Asset Repair | `validate`, `on_update` | Validation + Songa sync |
-| Comment | `on_update` | Asset repair comment webhook |
 | Payment Entry | `on_submit` | Lease / commission deduction webhook when applicable |
 | Journal Entry | `on_submit` | Lease payment JE → commission deduction webhook when applicable |
 | Purchase Invoice / Stock Entry | `validate` | Branch and cost-centre rules |

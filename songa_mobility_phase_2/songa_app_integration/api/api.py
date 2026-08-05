@@ -1108,55 +1108,6 @@ def check_asset_repair_status():
 
 
 @frappe.whitelist(allow_guest=False)
-def comment_on_asset_repair():
-	try:
-		data = check_for_empty_payload()
-
-		if isinstance(data, dict) and data.get("status") == "error":
-			return data
-
-		check_for_empty_values(data, ["asset_repair_id", "comment", "user_email"])
-
-		asset_repair_id = data.get("asset_repair_id")
-		user_email = data.get("user_email")
-		comment = data.get("comment")
-
-		if not frappe.db.exists("Asset Repair", {"custom_asset_repair_id": asset_repair_id}):
-			frappe.local.response["http_status_code"] = 404
-			return {"status": "error", "message": "Asset Repair not found"}
-
-		reference_name = frappe.db.get_value(
-			"Asset Repair", {"custom_asset_repair_id": asset_repair_id}, "name"
-		)
-		_validate_asset_repair_actor(user_email, reference_name)
-
-		doc = frappe.get_doc(
-			{
-				"doctype": "Comment",
-				"comment_type": "Comment",
-				"reference_doctype": "Asset Repair",
-				"reference_name": reference_name,
-				"content": comment,
-				"published": 1,
-			}
-		)
-		doc.insert()
-		frappe.db.set_value("Comment", doc.name, "owner", user_email, update_modified=False)
-
-		return {"status": "success", "message": "Comment added successfully."}
-	except frappe.PermissionError as e:
-		frappe.local.response["http_status_code"] = frappe.local.response.get("http_status_code") or 403
-		return {"status": "error", "message": str(e)}
-	except (frappe.DoesNotExistError, frappe.ValidationError, ValueError) as e:
-		status_code = frappe.local.response.get("http_status_code") or 400
-		frappe.local.response["http_status_code"] = status_code
-		return {"status": "error", "message": str(e)}
-	except Exception as e:
-		frappe.local.response["http_status_code"] = 500
-		return {"status": "error", "message": str(e)}
-
-
-@frappe.whitelist(allow_guest=False)
 def update_asset_repair():
 	try:
 		data = check_for_empty_payload()

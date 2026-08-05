@@ -153,9 +153,6 @@ doc_events = {
 	"Driver Commission Ledger": {
 		"on_update": "songa_mobility_phase_2.services.workflow_handlers.handle_commission_ledger_workflow.handle_commission_ledger_workflow"
 	},
-	"Comment": {
-		"on_update": "songa_mobility_phase_2.songa_app_integration.events.events.on_comment_update",
-	},
 	"Asset Repair": {
 		"validate": "songa_mobility_phase_2.songa_app_integration.events.events.on_asset_repair_validate",
 		"on_update": "songa_mobility_phase_2.songa_app_integration.events.events.on_asset_repair_update",
