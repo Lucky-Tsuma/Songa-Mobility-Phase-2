@@ -187,20 +187,67 @@ def log_failed_songa_webhook(
 		return None
 
 
-def _mark_webhook_log_sent(doc, result):
-	now = frappe.utils.now_datetime()
-	doc.db_set(
-		{
-			"status": "Sent",
-			"http_status": result.get("http_status"),
-			"response_body": _truncate(result.get("response_body")),
-			"error_message": None,
-			"attempt_count": (doc.attempt_count or 0) + 1,
-			"last_attempt_on": now,
-			"resolved_on": now,
-		},
-		update_modified=True,
-	)
+def log_sent_songa_webhook(
+	*,
+	context,
+	payload=None,
+	endpoint=None,
+	http_status=None,
+	response_body=None,
+	webhook_log_name=None,
+):
+	"""Persist or update a successful Songa webhook delivery. Never raises to callers."""
+	try:
+		payload = _parse_payload(payload)
+		reference_doctype, reference_name = _extract_reference(payload)
+		driver = payload.get("driver_id")
+		now = frappe.utils.now_datetime()
+
+		if webhook_log_name:
+			doc = frappe.get_doc("Songa Webhook Log", webhook_log_name)
+		else:
+			existing_name = _find_existing_failed_log(payload)
+			if existing_name:
+				doc = frappe.get_doc("Songa Webhook Log", existing_name)
+			else:
+				doc = frappe.get_doc(
+					{
+						"doctype": "Songa Webhook Log",
+						"context": context or "Songa Webhook",
+						"action_type": payload.get("action_type"),
+						"reference_doctype": reference_doctype,
+						"reference_name": reference_name,
+						"driver": driver if driver and frappe.db.exists("Driver", driver) else None,
+						"payload": frappe.as_json(payload, indent=2) if payload else None,
+						"attempt_count": 0,
+					}
+				)
+
+		doc.status = "Sent"
+		doc.context = context or doc.context or "Songa Webhook"
+		doc.action_type = payload.get("action_type") or doc.action_type
+		doc.reference_doctype = reference_doctype or doc.reference_doctype
+		doc.reference_name = reference_name or doc.reference_name
+		if driver and frappe.db.exists("Driver", driver):
+			doc.driver = driver
+		doc.endpoint = endpoint or doc.endpoint
+		doc.http_status = http_status
+		doc.error_message = None
+		doc.response_body = _truncate(response_body)
+		doc.payload = frappe.as_json(payload, indent=2) if payload else doc.payload
+		doc.attempt_count = (doc.attempt_count or 0) + 1
+		doc.last_attempt_on = now
+		doc.resolved_on = now
+
+		if doc.is_new():
+			doc.insert(ignore_permissions=True)
+		else:
+			doc.save(ignore_permissions=True)
+
+		return doc.name
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Songa Webhook Log")
+		return None
 
 
 def retry_songa_webhook_log(name, *, abandon_on_max_attempts=True):
@@ -230,7 +277,14 @@ def retry_songa_webhook_log(name, *, abandon_on_max_attempts=True):
 
 	result = _deliver_songa_webhook(url, payload)
 	if result["success"]:
-		_mark_webhook_log_sent(doc, result)
+		log_sent_songa_webhook(
+			context=doc.context,
+			payload=payload,
+			endpoint=url,
+			http_status=result.get("http_status"),
+			response_body=result.get("response_body"),
+			webhook_log_name=doc.name,
+		)
 		get_songa_webhook_logger().info(
 			f"{doc.context}: Retry succeeded for {doc.name}. Payload: {payload}. "
 			f"Response: {result.get('response_body')}"
@@ -305,7 +359,8 @@ def send_songa_webhook(payload, *, context):
 	Post a payload to the Songa webhook endpoint.
 
 	Resolves the URL from Songa Customization Settings, posts JSON with a timeout,
-	logs to songa_webhook_log, and records failures in Error Log and Songa Webhook Log.
+	logs to songa_webhook_log, and records every attempt in Songa Webhook Log
+	(Sent on success, Failed on failure; failures also go to Error Log).
 	Returns True on success, False otherwise. Never raises for webhook delivery failures.
 	"""
 	payload = _parse_payload(payload)
@@ -327,6 +382,13 @@ def send_songa_webhook(payload, *, context):
 	if result["success"]:
 		get_songa_webhook_logger().info(
 			f"{context}: Sent to Songa. Payload: {payload}. Response: {result.get('response_body')}"
+		)
+		log_sent_songa_webhook(
+			context=context,
+			payload=payload,
+			endpoint=url,
+			http_status=result.get("http_status"),
+			response_body=result.get("response_body"),
 		)
 		return True
 

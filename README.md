@@ -589,6 +589,7 @@ Returns repair details, workflow state, costs, and stock items if consumed.
 
 - **Success (HTTP 200):**
   - writes success entry to the `songa_webhook_log` file logger
+  - creates/updates a **Songa Webhook Log** row with status `Sent` *(sets `resolved_on`)*
   - returns `True` to caller
 - **Failure (network error or non-200):**
   - writes to Error Log
@@ -602,7 +603,7 @@ Returns repair details, workflow state, costs, and stock items if consumed.
 - Desk abandon: `abandon_songa_webhook_log`
 - Scheduled retry: `retry_failed_songa_webhooks` every 5 minutes
 - Max retries: `5` attempts, then status moves to `Abandoned`
-- Retry success marks row `Sent` and sets `resolved_on`
+- Retry success marks the same row `Sent` and sets `resolved_on`
 
 ### Operational notes
 
