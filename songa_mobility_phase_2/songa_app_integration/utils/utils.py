@@ -581,54 +581,10 @@ def _get_stk_payment_settings():
 
 
 def submit_sales_invoice(invoice):
-	"""Submit a Sales Invoice via workflow action ``Submit``.
+	"""Submit a Sales Invoice via its workflow (Submit action)."""
+	from frappe.model.workflow import apply_workflow
 
-	Uses the same state transition as ``apply_workflow``, but skips DocPerm checks
-	so the Songa App API user can bill wallet recharges.
-	"""
-	from frappe.model.docstatus import DocStatus
-	from frappe.model.workflow import (
-		WorkflowTransitionError,
-		get_workflow,
-		is_transition_condition_satisfied,
-	)
-
-	invoice.reload()
-	workflow = get_workflow(invoice.doctype)
-	current_state = invoice.get(workflow.workflow_state_field)
-	if not current_state:
-		current_state = workflow.states[0].state
-		invoice.set(workflow.workflow_state_field, current_state)
-
-	transition = None
-	for t in workflow.transitions:
-		if t.state != current_state or t.action != "Submit":
-			continue
-		if not is_transition_condition_satisfied(t, invoice):
-			continue
-		transition = t
-		break
-
-	if not transition:
-		frappe.throw(frappe._("Not a valid Workflow Action"), WorkflowTransitionError)
-
-	invoice.set(workflow.workflow_state_field, transition.next_state)
-	next_state = next(d for d in workflow.states if d.state == transition.next_state)
-	if next_state.update_field:
-		invoice.set(next_state.update_field, next_state.update_value)
-
-	new_docstatus = DocStatus(next_state.doc_status or 0)
-	if invoice.docstatus.is_draft() and new_docstatus.is_submitted():
-		invoice.flags.ignore_permissions = True
-		invoice.submit()
-	elif invoice.docstatus.is_draft() and new_docstatus.is_draft():
-		invoice.flags.ignore_permissions = True
-		invoice.save()
-	else:
-		frappe.throw(frappe._("Illegal Document Status for {0}").format(next_state.state))
-
-	invoice.add_comment("Workflow", frappe._(next_state.state))
-	return invoice
+	return apply_workflow(invoice, "Submit")
 
 
 def _create_sales_invoice_for_wallet_recharge(wallet_doc, *, item_code):
@@ -693,7 +649,6 @@ def _create_payment_request_for_wallet_recharge(*, sales_invoice, phone_number, 
 		}
 	)
 	payment_request.insert(ignore_permissions=True)
-	payment_request.flags.ignore_permissions = True
 	payment_request.submit()
 	return payment_request
 
