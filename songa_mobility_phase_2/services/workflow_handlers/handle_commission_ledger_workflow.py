@@ -129,7 +129,9 @@ def handle_commission_ledger_workflow(doc, method):
 			payload.update(_get_linked_wallet_recharge(doc))
 			payload.update(_wallet_balance_fields(doc.driver, usage))
 		elif doc.transaction_type == "Allocation":
-			payload["action_type"] = "Approved Commission"
+			payload["action_type"] = (
+				"Approved Commission" if doc.workflow_state == "Approved" else "Rejected Commission"
+			)
 		else:
 			return
 
