@@ -559,6 +559,194 @@ def _mpesa_wallet_action_type(reference_doctype):
 	return None
 
 
+def _get_wallet_item_field(wallet_doctype):
+	if wallet_doctype == "Rental Days":
+		return "rental_recharge_item"
+	if wallet_doctype == "Energy KWh":
+		return "battery_swap_item"
+	frappe.throw(f"Unsupported wallet doctype for M-Pesa Express billing: {wallet_doctype}")
+
+
+def _get_stk_payment_settings():
+	settings = frappe.get_single("Songa Customization Settings")
+	required_fields = [
+		"mode_of_payment",
+		"payment_gateway_account",
+	]
+	missing = [field for field in required_fields if not settings.get(field)]
+	if missing:
+		labels = [frappe.unscrub(field) for field in missing]
+		frappe.throw("Please set the following fields on Songa Customization Settings: " + ", ".join(labels))
+	return settings
+
+
+def submit_sales_invoice(invoice):
+	"""Submit a Sales Invoice via workflow action ``Submit``.
+
+	Uses the same state transition as ``apply_workflow``, but skips DocPerm checks
+	so the Songa App API user can bill wallet recharges.
+	"""
+	from frappe.model.docstatus import DocStatus
+	from frappe.model.workflow import (
+		WorkflowTransitionError,
+		get_workflow,
+		is_transition_condition_satisfied,
+	)
+
+	invoice.reload()
+	workflow = get_workflow(invoice.doctype)
+	current_state = invoice.get(workflow.workflow_state_field)
+	if not current_state:
+		current_state = workflow.states[0].state
+		invoice.set(workflow.workflow_state_field, current_state)
+
+	transition = None
+	for t in workflow.transitions:
+		if t.state != current_state or t.action != "Submit":
+			continue
+		if not is_transition_condition_satisfied(t, invoice):
+			continue
+		transition = t
+		break
+
+	if not transition:
+		frappe.throw(frappe._("Not a valid Workflow Action"), WorkflowTransitionError)
+
+	invoice.set(workflow.workflow_state_field, transition.next_state)
+	next_state = next(d for d in workflow.states if d.state == transition.next_state)
+	if next_state.update_field:
+		invoice.set(next_state.update_field, next_state.update_value)
+
+	new_docstatus = DocStatus(next_state.doc_status or 0)
+	if invoice.docstatus.is_draft() and new_docstatus.is_submitted():
+		invoice.flags.ignore_permissions = True
+		invoice.submit()
+	elif invoice.docstatus.is_draft() and new_docstatus.is_draft():
+		invoice.flags.ignore_permissions = True
+		invoice.save()
+	else:
+		frappe.throw(frappe._("Illegal Document Status for {0}").format(next_state.state))
+
+	invoice.add_comment("Workflow", frappe._(next_state.state))
+	return invoice
+
+
+def _create_sales_invoice_for_wallet_recharge(wallet_doc, *, item_code):
+	driver = frappe.get_doc("Driver", wallet_doc.driver)
+	if not driver.customer:
+		frappe.throw("Driver does not have an associated customer.")
+
+	item_uom = frappe.db.get_value("Item", item_code, "stock_uom") or "Nos"
+	invoice = frappe.get_doc(
+		{
+			"doctype": "Sales Invoice",
+			"customer": driver.customer,
+			"company": wallet_doc.company,
+			"posting_date": frappe.utils.nowdate(),
+			"due_date": frappe.utils.nowdate(),
+			"is_return": 0,
+			"items": [
+				{
+					"item_code": item_code,
+					"qty": 1,
+					"uom": item_uom,
+					"rate": wallet_doc.amount,
+				}
+			],
+		}
+	)
+	invoice.insert(ignore_permissions=True)
+	return submit_sales_invoice(invoice)
+
+
+def _create_payment_request_for_wallet_recharge(*, sales_invoice, phone_number, settings):
+	gateway_account = frappe.get_doc("Payment Gateway Account", settings.payment_gateway_account)
+	if not gateway_account.payment_gateway:
+		frappe.throw("Payment Gateway is required on the selected Payment Gateway Account.")
+	if not gateway_account.payment_account:
+		frappe.throw("Payment Account is required on the selected Payment Gateway Account.")
+	if gateway_account.payment_channel and gateway_account.payment_channel != "Phone":
+		frappe.throw("Selected Payment Gateway Account must use Phone payment channel.")
+
+	payment_request = frappe.get_doc(
+		{
+			"doctype": "Payment Request",
+			"payment_request_type": "Inward",
+			"reference_doctype": "Sales Invoice",
+			"reference_name": sales_invoice.name,
+			"party_type": "Customer",
+			"party": sales_invoice.customer,
+			"party_name": sales_invoice.customer_name,
+			"company": sales_invoice.company,
+			"currency": sales_invoice.currency,
+			"grand_total": sales_invoice.outstanding_amount or sales_invoice.grand_total,
+			"outstanding_amount": sales_invoice.outstanding_amount or sales_invoice.grand_total,
+			"mode_of_payment": settings.mode_of_payment,
+			"payment_gateway_account": settings.payment_gateway_account,
+			"payment_gateway": gateway_account.payment_gateway,
+			"payment_account": gateway_account.payment_account,
+			"payment_channel": gateway_account.payment_channel or "Phone",
+			"phone_number": phone_number,
+			"email_to": frappe.session.user,
+			"subject": f"Wallet recharge payment request for {sales_invoice.name}",
+			"mute_email": 1,
+		}
+	)
+	payment_request.insert(ignore_permissions=True)
+	payment_request.flags.ignore_permissions = True
+	payment_request.submit()
+	return payment_request
+
+
+def _find_mpesa_express_request_for_payment_request(payment_request_name):
+	requests = frappe.get_all(
+		"Mpesa Express Request",
+		filters={
+			"reference_doctype": "Payment Request",
+			"reference_name": payment_request_name,
+		},
+		fields=["name"],
+		order_by="creation desc",
+		limit=1,
+	)
+	if not requests:
+		frappe.throw(f"No Mpesa Express Request was created for Payment Request {payment_request_name}.")
+	return requests[0].name
+
+
+def create_wallet_mpesa_express_request(wallet_doctype, wallet_name, *, phone_number):
+	"""Create SI+PR and return the resulting Mpesa Express Request for a wallet recharge."""
+	if wallet_doctype not in ("Rental Days", "Energy KWh"):
+		frappe.throw("M-Pesa Express wallet billing is only supported for Rental Days and Energy KWh.")
+
+	wallet_doc = frappe.get_doc(wallet_doctype, wallet_name)
+	if wallet_doc.docstatus != 1:
+		frappe.throw("Wallet document must be submitted.")
+	if wallet_doc.transaction_type != "Recharge":
+		frappe.throw("Only Recharge documents can be billed through M-Pesa Express.")
+
+	settings = _get_stk_payment_settings()
+	item_field = _get_wallet_item_field(wallet_doctype)
+	item_code = settings.get(item_field)
+	if not item_code:
+		frappe.throw(
+			"Please set the following field on Songa Customization Settings: " + frappe.unscrub(item_field)
+		)
+
+	sales_invoice = _create_sales_invoice_for_wallet_recharge(wallet_doc, item_code=item_code)
+	payment_request = _create_payment_request_for_wallet_recharge(
+		sales_invoice=sales_invoice,
+		phone_number=phone_number,
+		settings=settings,
+	)
+	mpesa_express_request = _find_mpesa_express_request_for_payment_request(payment_request.name)
+	return {
+		"sales_invoice": sales_invoice.name,
+		"payment_request": payment_request.name,
+		"mpesa_express_request": mpesa_express_request,
+	}
+
+
 def get_mpesa_wallet_accounts(reference_doctype):
 	"""Return debit/credit accounts for an M-Pesa wallet recharge Journal Entry."""
 	fields = MPESA_WALLET_ACCOUNT_FIELDS.get(reference_doctype)
@@ -818,68 +1006,68 @@ def retry_mpesa_wallet_processing(name):
 @frappe.whitelist(allow_guest=False)
 def process_mpesa_express_request(doc):
 	try:
-		if getattr(doc, "custom_songa_wallet_processed", 0):
-			return
-
-		process_status = getattr(doc, "custom_songa_wallet_process_status", None) or "Pending"
-		if process_status == "Abandoned":
-			return
-
-		attempt_count = getattr(doc, "custom_songa_wallet_attempt_count", 0) or 0
-		if attempt_count >= MAX_MPESA_WALLET_ATTEMPTS:
-			return
-
 		if doc.status not in ("Completed", "Failed"):
 			return
 
-		if doc.reference_doctype not in ("Rental Days", "Energy KWh"):
+		wallet = frappe.db.get_value(
+			"Rental Days",
+			{"mpesa_express_request": doc.name},
+			["name", "driver", "amount", "transaction_type", "no_of_days", "status"],
+			as_dict=True,
+		)
+		wallet_doctype = "Rental Days"
+
+		if not wallet:
+			wallet = frappe.db.get_value(
+				"Energy KWh",
+				{"mpesa_express_request": doc.name},
+				["name", "driver", "amount", "transaction_type", "energy_qty", "status"],
+				as_dict=True,
+			)
+			wallet_doctype = "Energy KWh"
+
+		if not wallet:
 			return
 
-		reference_doctype = doc.reference_doctype
-		reference_doc = frappe.get_doc(reference_doctype, doc.reference_name)
-
-		if reference_doc.status != doc.status:
+		if wallet.status != doc.status:
 			try:
 				frappe.db.savepoint("mpesa_express_request")
-				frappe.db.set_value(reference_doctype, doc.reference_name, "status", doc.status)
+				frappe.db.set_value(wallet_doctype, wallet.name, "status", doc.status)
 				frappe.db.commit()
 			except Exception:
 				frappe.db.rollback(save_point="mpesa_express_request")
 				raise
 
 		if doc.status == "Completed":
-			post_mpesa_wallet_journal_entry(doc, reference_doc)
-
-			if not _mpesa_songa_webhook_already_sent(doc.name, reference_doctype):
+			if not _mpesa_songa_webhook_already_sent(doc.name, wallet_doctype):
 				payload = {
-					"driver_id": reference_doc.driver,
-					"transaction_type": reference_doc.transaction_type,
-					"amount": reference_doc.amount,
+					"driver_id": wallet.driver,
+					"transaction_type": wallet.transaction_type,
+					"amount": wallet.amount,
 					"mpesa_express_request": doc.name,
-					"action_type": _mpesa_wallet_action_type(reference_doctype),
+					"action_type": _mpesa_wallet_action_type(wallet_doctype),
 				}
 
-				if reference_doctype == "Rental Days":
-					rental_balance = get_rental_days_balance_by_driver(driver_id=reference_doc.driver)
+				if wallet_doctype == "Rental Days":
+					rental_balance = get_rental_days_balance_by_driver(driver_id=wallet.driver)
 					if rental_balance.get("status") == "success":
 						payload["rental_days_balance"] = rental_balance.get("total_rental_days", 0)
-					payload["rental_day_id"] = reference_doc.name
-					payload["no_of_days"] = reference_doc.no_of_days
-				elif reference_doctype == "Energy KWh":
-					energy_balance = get_energy_kwh_balance_by_driver(driver_id=reference_doc.driver)
+					payload["rental_day_id"] = wallet.name
+					payload["no_of_days"] = wallet.no_of_days
+				elif wallet_doctype == "Energy KWh":
+					energy_balance = get_energy_kwh_balance_by_driver(driver_id=wallet.driver)
 					if energy_balance.get("status") == "success":
 						payload["energy_kwh_balance"] = energy_balance.get("total_kwh", 0)
-					payload["energy_kwh_id"] = reference_doc.name
-					payload["kwh"] = reference_doc.energy_qty
+					payload["energy_kwh_id"] = wallet.name
+					payload["kwh"] = wallet.energy_qty
 
 				send_songa_webhook(payload, context="Mpesa Express Request")
 		else:
 			frappe.logger().info(
-				f"{reference_doctype} recharge cancelled for driver {reference_doc.driver} "
+				f"{wallet_doctype} recharge cancelled for driver {wallet.driver} "
 				f"due to failed M-Pesa payment."
 			)
 
-		_mark_mpesa_wallet_processed(doc.name)
 		frappe.db.commit()
 
 	except Exception as e:

@@ -36,12 +36,12 @@ class TestMpesaExpressAutoProcess(unittest.TestCase):
 
 	@patch("songa_mobility_phase_2.songa_app_integration.utils.utils.process_mpesa_express_request")
 	@patch("frappe.get_doc")
-	def test_auto_process_skips_non_wallet_reference(self, get_doc, process):
+	def test_auto_process_allows_payment_request_reference(self, get_doc, process):
 		get_doc.return_value = self._wallet_doc(reference_doctype="Payment Request")
 
 		mpesa_express.auto_process_mpesa_express_wallet("MER-001")
 
-		process.assert_not_called()
+		process.assert_called_once()
 
 	@patch("songa_mobility_phase_2.songa_app_integration.utils.utils.process_mpesa_express_request")
 	@patch("frappe.get_doc")
@@ -52,19 +52,18 @@ class TestMpesaExpressAutoProcess(unittest.TestCase):
 
 		process.assert_not_called()
 
-	@patch("songa_mobility_phase_2.songa_app_integration.utils.utils.record_mpesa_wallet_processing_failure")
 	@patch(
 		"songa_mobility_phase_2.songa_app_integration.utils.utils.process_mpesa_express_request",
 		side_effect=Exception("JE failed"),
 	)
 	@patch("frappe.get_doc")
 	@patch("frappe.log_error")
-	def test_auto_process_records_failure(self, _log, get_doc, process, record_failure):
+	def test_auto_process_logs_failure(self, _log, get_doc, process):
 		get_doc.return_value = self._wallet_doc()
 
 		mpesa_express.auto_process_mpesa_express_wallet("MER-001")
 
-		record_failure.assert_called_once_with("MER-001")
+		_log.assert_called()
 
 	def test_wrapped_status_update_triggers_auto_process(self):
 		original = MagicMock()

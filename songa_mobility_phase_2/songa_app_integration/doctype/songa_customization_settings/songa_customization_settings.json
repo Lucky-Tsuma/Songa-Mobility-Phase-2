@@ -7,10 +7,16 @@
  "field_order": [
   "driver_commission_accounts_section",
   "driver_commission_account",
-  "stk_push_payment_gateway",
   "column_break_lpcu",
-  "songa_webhook_endpoint",
   "driver_parent_supplier_group",
+  "stk_push_section",
+  "mode_of_payment",
+  "stk_push_payment_gateway",
+  "column_break_rvsu",
+  "payment_gateway_account",
+  "songa_developer_settings_section",
+  "songa_webhook_endpoint",
+  "column_break_shns",
   "battery_swap_tab",
   "commission_battery_swap_section",
   "battery_swap_commission_debit",
@@ -20,6 +26,9 @@
   "battery_swap_mpesa_debit",
   "column_break_wegn",
   "battery_swap_mpesa_credit",
+  "section_break_mrpu",
+  "battery_swap_item",
+  "column_break_hopr",
   "rental_recharge_tab",
   "commission_rental_recharge_section",
   "rental_recharge_commission_debit",
@@ -29,6 +38,9 @@
   "rental_recharge_mpesa_debit",
   "column_break_plqj",
   "rental_recharge_mpesa_credit",
+  "section_break_btvu",
+  "rental_recharge_item",
+  "column_break_fnms",
   "lease_payment_tab",
   "lease_payment_accounts_section",
   "lease_payment_debit",
@@ -248,13 +260,79 @@
    "label": "Cost Center",
    "options": "Cost Center",
    "reqd": 1
+  },
+  {
+   "fieldname": "section_break_mrpu",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "This item will be used when creating invoices used for battery swap.",
+   "fieldname": "battery_swap_item",
+   "fieldtype": "Link",
+   "label": "Battery Swap Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_hopr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_btvu",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "This item will be used when creating invoices used for rental recharge.",
+   "fieldname": "rental_recharge_item",
+   "fieldtype": "Link",
+   "label": "Rental Recharge Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_fnms",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "stk_push_section",
+   "fieldtype": "Section Break",
+   "label": "STK Push"
+  },
+  {
+   "fieldname": "column_break_rvsu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "songa_developer_settings_section",
+   "fieldtype": "Section Break",
+   "label": "Songa Developer Settings"
+  },
+  {
+   "fieldname": "column_break_shns",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Attached to payment request during stk push.",
+   "fieldname": "mode_of_payment",
+   "fieldtype": "Link",
+   "label": "Mode Of Payment",
+   "options": "Mode of Payment",
+   "reqd": 1
+  },
+  {
+   "description": "Attached to payment request during stk push.",
+   "fieldname": "payment_gateway_account",
+   "fieldtype": "Link",
+   "label": "Payment Gateway Account",
+   "options": "Payment Gateway Account",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-05 10:01:49.288656",
+ "modified": "2026-08-06 10:29:30.296408",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Songa Customization Settings",
