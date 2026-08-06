@@ -321,7 +321,6 @@ fixtures = [
 				[
 					"Asset",
 					"Asset Repair",
-					"Comment",
 					"Driver Commission Ledger",
 					"Energy KWh",
 					"Item",
