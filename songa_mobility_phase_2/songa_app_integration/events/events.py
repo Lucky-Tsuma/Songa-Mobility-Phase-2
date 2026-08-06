@@ -16,6 +16,7 @@ def on_asset_repair_update(doc, method):
 	if doc.workflow_state == "Completed" and doc.workflow_state != doc.get_doc_before_save().workflow_state:
 		payload = {
 			"action_type": ("Service Completed" if doc.repair_status == "Completed" else "Service Cancelled"),
+			"asset_repair": doc.name,
 			"asset_repair_id": doc.custom_asset_repair_id,
 			"asset": doc.asset,
 			"asset_name": doc.asset_name,

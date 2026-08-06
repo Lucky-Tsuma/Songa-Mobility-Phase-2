@@ -547,6 +547,7 @@ Returns repair details, workflow state, costs, and stock items if consumed.
 ```json
 {
   "action_type": "Service Completed",
+  "asset_repair": "AR-2026-00007",
   "asset_repair_id": "SR-REPAIR-9011",
   "asset": "AST-TRIKE-0041",
   "asset_name": "Trike 41",
