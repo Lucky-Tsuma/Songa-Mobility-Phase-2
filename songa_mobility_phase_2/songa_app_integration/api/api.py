@@ -166,7 +166,7 @@ RECHARGE_ACCOUNT_FIELDS = {
 def _validate_recharge_account_settings(product, payment_method):
 	if payment_method == "mpesa":
 		item_field = "rental_recharge_item" if product == "rental_recharge" else "battery_swap_item"
-		fields = ("mode_of_payment", "payment_gateway_account", item_field)
+		fields = ("mpesa_express_mode_of_payment", "payment_gateway_account", item_field)
 	elif payment_method == "mpesa_c2b":
 		item_field = "rental_recharge_item" if product == "rental_recharge" else "battery_swap_item"
 		fields = (item_field,)

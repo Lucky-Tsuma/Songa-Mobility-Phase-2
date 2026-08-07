@@ -150,7 +150,7 @@ bench migrate
 > ⚙️ **First-run setup** — open **Songa Customization Settings** from the workspace and configure:
 >
 > - Driver Commission Account
-> - **STK / Express:** Mode of Payment and Payment Gateway Account *(Payment Request)*
+> - **STK / Express:** Mpesa Express Mode of Payment and Payment Gateway Account *(Payment Request)*
 > - **Sales Invoice items:** Rental recharge item and Battery swap item *(Express and C2B)*
 > - Songa Webhook Endpoint
 > - Lease payment accounts *(optional; PE/JE commission-deduction webhooks)*
@@ -213,8 +213,8 @@ Wallet M-Pesa recharges post GL through **ERPNext Payment Entry** against a **Sa
 
 | Channel | Billing path | Mode of payment |
 |---------|--------------|-----------------|
-| **Express (`mpesa`)** | Sales Invoice → Payment Request → Mpesa Express Request (STK) → Payment Entry | From Songa Customization Settings *(PR)* |
-| **C2B (`mpesa_c2b`)** | Sales Invoice at wallet create → Mpesa C2B Payment Register → Payment Entry against that SI | From Mpesa Settings for the till/paybill *(auto-filled on C2B)* |
+| **Express (`mpesa`)** | Sales Invoice → Payment Request → Mpesa Express Request (STK) → Payment Entry | From Songa Customization Settings `mpesa_express_mode_of_payment` *(PR)* |
+| **C2B (`mpesa_c2b`)** | Sales Invoice at wallet create → Mpesa C2B Payment Register → Payment Entry against that SI | From C2B register, else Songa Customization Settings `mpesa_c2b_mode_of_payment` |
 
 - SI party is `Driver.customer`; line qty `1`, rate = wallet amount; SI is submitted via workflow action **Submit**.
 - For C2B without `transaction_id`, the API returns `sales_invoice` — use that name as the PayBill account reference (BillRef) so mpsa can auto-match; ops can still link and Complete on the desk later.

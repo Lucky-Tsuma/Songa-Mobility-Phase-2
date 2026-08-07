@@ -561,7 +561,7 @@ def _get_wallet_item_field(wallet_doctype):
 def _get_stk_payment_settings():
 	settings = frappe.get_single("Songa Customization Settings")
 	required_fields = [
-		"mode_of_payment",
+		"mpesa_express_mode_of_payment",
 		"payment_gateway_account",
 	]
 	missing = [field for field in required_fields if not settings.get(field)]
@@ -836,10 +836,26 @@ def reconcile_c2b_to_sales_invoice(c2b_name, sales_invoice_name):
 			pe_name = None
 
 	if not pe_name:
-		if not c2b.mode_of_payment:
+		mode_of_payment = c2b.mode_of_payment
+		if not mode_of_payment:
+			mode_of_payment = frappe.db.get_single_value(
+				"Songa Customization Settings", "mpesa_c2b_mode_of_payment"
+			)
+			if mode_of_payment:
+				frappe.db.set_value(
+					"Mpesa C2B Payment Register",
+					c2b_name,
+					"mode_of_payment",
+					mode_of_payment,
+					update_modified=False,
+				)
+				c2b.mode_of_payment = mode_of_payment
+
+		if not mode_of_payment:
 			frappe.throw(
-				f"Mode of Payment is required on Mpesa C2B Payment Register {c2b_name} "
-				"(auto-filled from Mpesa Settings for the till/paybill)."
+				f"Mode of Payment is required for Mpesa C2B Payment Register {c2b_name}. "
+				"Set it on the C2B record or on Songa Customization Settings "
+				"(Mpesa C2B Mode of Payment)."
 			)
 		if not c2b.company:
 			frappe.throw(f"Company is required on Mpesa C2B Payment Register {c2b_name}.")
@@ -861,7 +877,7 @@ def reconcile_c2b_to_sales_invoice(c2b_name, sales_invoice_name):
 			c2b.customer,
 			amount,
 			c2b.currency or sales_invoice.currency,
-			c2b.mode_of_payment,
+			mode_of_payment,
 			"Customer",
 			c2b.posting_date,
 			c2b.name,
@@ -910,7 +926,7 @@ def _create_payment_request_for_wallet_recharge(*, sales_invoice, phone_number, 
 			"currency": sales_invoice.currency,
 			"grand_total": sales_invoice.outstanding_amount or sales_invoice.grand_total,
 			"outstanding_amount": sales_invoice.outstanding_amount or sales_invoice.grand_total,
-			"mode_of_payment": settings.mode_of_payment,
+			"mode_of_payment": settings.mpesa_express_mode_of_payment,
 			"payment_gateway_account": settings.payment_gateway_account,
 			"payment_gateway": gateway_account.payment_gateway,
 			"payment_account": gateway_account.payment_account,
