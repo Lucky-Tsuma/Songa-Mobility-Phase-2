@@ -581,10 +581,13 @@ def _get_stk_payment_settings():
 
 
 def submit_sales_invoice(invoice):
-	"""Submit a Sales Invoice via its workflow (Submit action)."""
 	from frappe.model.workflow import apply_workflow
 
 	return apply_workflow(invoice, "Submit")
+
+
+def _wallet_si_remarks(wallet_doctype, wallet_name):
+	return f"Songa Wallet|{wallet_doctype}|{wallet_name}"
 
 
 def _create_sales_invoice_for_wallet_recharge(wallet_doc, *, item_code):
@@ -601,6 +604,7 @@ def _create_sales_invoice_for_wallet_recharge(wallet_doc, *, item_code):
 			"posting_date": frappe.utils.nowdate(),
 			"due_date": frappe.utils.nowdate(),
 			"is_return": 0,
+			"remarks": _wallet_si_remarks(wallet_doc.doctype, wallet_doc.name),
 			"items": [
 				{
 					"item_code": item_code,
@@ -613,6 +617,284 @@ def _create_sales_invoice_for_wallet_recharge(wallet_doc, *, item_code):
 	)
 	invoice.insert(ignore_permissions=True)
 	return submit_sales_invoice(invoice)
+
+
+def _find_sales_invoice_for_wallet(wallet_doctype, wallet_name):
+	"""Resolve the wallet Sales Invoice from C2B/PE links or remarks marker."""
+	wallet = frappe.get_doc(wallet_doctype, wallet_name)
+	c2b_name = wallet.get("mpesa_c2b_payment_register")
+	if c2b_name:
+		c2b = frappe.db.get_value(
+			"Mpesa C2B Payment Register",
+			c2b_name,
+			["payment_entry", "billrefnumber"],
+			as_dict=True,
+		)
+		if c2b:
+			if c2b.payment_entry and frappe.db.exists("Payment Entry", c2b.payment_entry):
+				refs = frappe.get_all(
+					"Payment Entry Reference",
+					filters={
+						"parent": c2b.payment_entry,
+						"reference_doctype": "Sales Invoice",
+					},
+					pluck="reference_name",
+				)
+				for ref in refs:
+					if ref:
+						return ref
+			if c2b.billrefnumber and frappe.db.exists("Sales Invoice", c2b.billrefnumber):
+				return c2b.billrefnumber
+
+	marker = _wallet_si_remarks(wallet_doctype, wallet_name)
+	invoices = frappe.get_all(
+		"Sales Invoice",
+		filters={
+			"remarks": ["like", f"%{marker}%"],
+			"docstatus": ["<", 2],
+		},
+		pluck="name",
+		order_by="creation desc",
+		limit=1,
+	)
+	return invoices[0] if invoices else None
+
+
+def create_wallet_c2b_sales_invoice(wallet_doctype, wallet_name):
+	"""Create (or return existing) Sales Invoice for a C2B wallet recharge."""
+	if wallet_doctype not in ("Rental Days", "Energy KWh"):
+		frappe.throw("C2B wallet billing is only supported for Rental Days and Energy KWh.")
+
+	existing = _find_sales_invoice_for_wallet(wallet_doctype, wallet_name)
+	if existing:
+		return frappe.get_doc("Sales Invoice", existing)
+
+	wallet_doc = frappe.get_doc(wallet_doctype, wallet_name)
+	if wallet_doc.docstatus != 1:
+		frappe.throw("Wallet document must be submitted.")
+	if wallet_doc.transaction_type != "Recharge":
+		frappe.throw("Only Recharge documents can be billed through M-Pesa C2B.")
+
+	settings = frappe.get_single("Songa Customization Settings")
+	item_field = _get_wallet_item_field(wallet_doctype)
+	item_code = settings.get(item_field)
+	if not item_code:
+		frappe.throw(
+			"Please set the following field on Songa Customization Settings: " + frappe.unscrub(item_field)
+		)
+
+	return _create_sales_invoice_for_wallet_recharge(wallet_doc, item_code=item_code)
+
+
+def _pe_allocates_to_sales_invoice(payment_entry_name, sales_invoice_name, amount=None):
+	if not payment_entry_name or not frappe.db.exists("Payment Entry", payment_entry_name):
+		return False
+	pe = frappe.get_doc("Payment Entry", payment_entry_name)
+	if pe.docstatus != 1:
+		return False
+	allocated = 0.0
+	for ref in pe.references:
+		if ref.reference_doctype == "Sales Invoice" and ref.reference_name == sales_invoice_name:
+			allocated += frappe.utils.flt(ref.allocated_amount)
+	if allocated <= 0:
+		return False
+	if amount is not None and abs(allocated - frappe.utils.flt(amount)) > 0.01:
+		return False
+	return True
+
+
+def _allocate_existing_pe_to_sales_invoice(payment_entry_name, sales_invoice):
+	"""Allocate an existing submitted PE against the Sales Invoice when possible."""
+	from erpnext.accounts.party import get_party_account
+
+	pe = frappe.get_doc("Payment Entry", payment_entry_name)
+	if pe.docstatus != 1:
+		frappe.throw(f"Payment Entry {payment_entry_name} is not submitted.")
+
+	if _pe_allocates_to_sales_invoice(payment_entry_name, sales_invoice.name):
+		return payment_entry_name
+
+	unallocated = frappe.utils.flt(pe.unallocated_amount)
+	if unallocated <= 0:
+		frappe.throw(
+			f"Payment Entry {payment_entry_name} has no unallocated amount to apply to "
+			f"Sales Invoice {sales_invoice.name}."
+		)
+
+	sales_invoice.reload()
+	reconcile_doc = frappe.new_doc("Payment Reconciliation")
+	reconcile_doc.party_type = "Customer"
+	reconcile_doc.party = sales_invoice.customer
+	reconcile_doc.company = sales_invoice.company
+	reconcile_doc.receivable_payable_account = get_party_account(
+		"Customer", sales_invoice.customer, sales_invoice.company
+	)
+
+	invoice_data = {
+		"invoice_type": "Sales Invoice",
+		"invoice_number": sales_invoice.name,
+		"invoice_date": sales_invoice.posting_date,
+		"amount": sales_invoice.grand_total,
+		"outstanding_amount": sales_invoice.outstanding_amount,
+		"currency": sales_invoice.currency,
+		"exchange_rate": 0,
+	}
+	payment_data = {
+		"reference_type": "Payment Entry",
+		"reference_name": pe.name,
+		"posting_date": pe.posting_date,
+		"amount": pe.unallocated_amount,
+		"unallocated_amount": pe.unallocated_amount,
+		"difference_amount": 0,
+		"currency": pe.paid_from_account_currency or pe.paid_to_account_currency,
+		"exchange_rate": 0,
+	}
+	args = {"invoices": [invoice_data], "payments": [payment_data]}
+	reconcile_doc.append("invoices", invoice_data)
+	reconcile_doc.append("payments", payment_data)
+	reconcile_doc.allocate_entries(args)
+	reconcile_doc.reconcile()
+
+	sales_invoice.reload()
+	if (
+		not _pe_allocates_to_sales_invoice(payment_entry_name, sales_invoice.name)
+		and frappe.utils.flt(sales_invoice.outstanding_amount) > 0.01
+	):
+		frappe.throw(
+			f"Could not allocate Payment Entry {payment_entry_name} to Sales Invoice {sales_invoice.name}."
+		)
+	return payment_entry_name
+
+
+def reconcile_c2b_to_sales_invoice(c2b_name, sales_invoice_name):
+	"""Ensure C2B has a Payment Entry allocated to the wallet Sales Invoice. This is done via the Payment Entry workflow."""
+	from frappe_mpsa_payments.frappe_mpsa_payments.api.payment_entry import create_payment_entry
+
+	c2b = frappe.get_doc("Mpesa C2B Payment Register", c2b_name)
+	sales_invoice = frappe.get_doc("Sales Invoice", sales_invoice_name)
+
+	if sales_invoice.docstatus != 1:
+		frappe.throw(f"Sales Invoice {sales_invoice_name} must be submitted.")
+
+	amount = frappe.utils.flt(c2b.transamount)
+	if (
+		abs(amount - frappe.utils.flt(sales_invoice.grand_total)) > 0.01
+		and frappe.utils.flt(sales_invoice.outstanding_amount) > 0.01
+	):
+		# Allow when SI outstanding matches payment (already partially paid elsewhere).
+		if abs(amount - frappe.utils.flt(sales_invoice.outstanding_amount)) > 0.01:
+			frappe.throw(
+				f"Amount mismatch: C2B transamount is {amount} but Sales Invoice "
+				f"outstanding is {sales_invoice.outstanding_amount}."
+			)
+
+	update_fields = {}
+	if not c2b.customer:
+		update_fields["customer"] = sales_invoice.customer
+	elif c2b.customer != sales_invoice.customer:
+		frappe.throw(
+			f"C2B customer {c2b.customer} does not match Sales Invoice customer {sales_invoice.customer}."
+		)
+	if not c2b.company:
+		update_fields["company"] = sales_invoice.company
+	if c2b.billrefnumber != sales_invoice.name:
+		update_fields["billrefnumber"] = sales_invoice.name
+	if update_fields:
+		frappe.db.set_value("Mpesa C2B Payment Register", c2b_name, update_fields, update_modified=False)
+		c2b.reload()
+
+	pe_name = c2b.payment_entry
+	if pe_name and frappe.db.exists("Payment Entry", pe_name):
+		pe_docstatus = frappe.db.get_value("Payment Entry", pe_name, "docstatus")
+		if pe_docstatus == 1:
+			if _pe_allocates_to_sales_invoice(pe_name, sales_invoice.name, amount):
+				return pe_name
+			# Prefer allocate-in-place when PE has unallocated amount.
+			unallocated = frappe.utils.flt(
+				frappe.db.get_value("Payment Entry", pe_name, "unallocated_amount")
+			)
+			if unallocated > 0:
+				return _allocate_existing_pe_to_sales_invoice(pe_name, sales_invoice)
+			# Wrong fully-allocated PE: cancel and recreate against this SI.
+			_cancel_linked_c2b_payment_entry(c2b)
+			frappe.db.set_value(
+				"Mpesa C2B Payment Register", c2b_name, "payment_entry", None, update_modified=False
+			)
+			c2b.reload()
+			pe_name = None
+		elif pe_docstatus == 0:
+			pe = frappe.get_doc("Payment Entry", pe_name)
+			pe.set("references", [])
+			pe.append(
+				"references",
+				{
+					"reference_doctype": "Sales Invoice",
+					"reference_name": sales_invoice.name,
+					"allocated_amount": amount,
+				},
+			)
+			pe.flags.ignore_permissions = True
+			pe.save()
+			pe.submit()
+			return pe.name
+		elif pe_docstatus == 2:
+			frappe.db.set_value(
+				"Mpesa C2B Payment Register", c2b_name, "payment_entry", None, update_modified=False
+			)
+			c2b.reload()
+			pe_name = None
+
+	if not pe_name:
+		if not c2b.mode_of_payment:
+			frappe.throw(
+				f"Mode of Payment is required on Mpesa C2B Payment Register {c2b_name} "
+				"(auto-filled from Mpesa Settings for the till/paybill)."
+			)
+		if not c2b.company:
+			frappe.throw(f"Company is required on Mpesa C2B Payment Register {c2b_name}.")
+		if not c2b.customer:
+			frappe.throw(f"Customer is required on Mpesa C2B Payment Register {c2b_name}.")
+
+		# Prefer stock C2B submit path when register is still draft.
+		if c2b.docstatus == 0:
+			c2b.submit_payment = 1
+			c2b.flags.ignore_permissions = True
+			c2b.save()
+			c2b.submit()
+			c2b.reload()
+			if c2b.payment_entry:
+				return c2b.payment_entry
+
+		payment_entry = create_payment_entry(
+			c2b.company,
+			c2b.customer,
+			amount,
+			c2b.currency or sales_invoice.currency,
+			c2b.mode_of_payment,
+			"Customer",
+			c2b.posting_date,
+			c2b.name,
+			c2b.posting_date,
+			None,
+			1,
+			references=[
+				{
+					"reference_doctype": "Sales Invoice",
+					"reference_name": sales_invoice.name,
+					"allocated_amount": amount,
+				}
+			],
+		)
+		frappe.db.set_value(
+			"Mpesa C2B Payment Register",
+			c2b_name,
+			"payment_entry",
+			payment_entry.name,
+			update_modified=False,
+		)
+		return payment_entry.name
+
+	return pe_name
 
 
 def _create_payment_request_for_wallet_recharge(*, sales_invoice, phone_number, settings):
@@ -1037,7 +1319,6 @@ def _clear_c2b_wallet_backref(c2b_name):
 		{
 			"custom_songa_reference_doctype": None,
 			"custom_songa_reference_name": None,
-			"submit_payment": 0,
 		},
 		update_modified=False,
 	)
@@ -1210,14 +1491,22 @@ def _link_mpesa_c2b_to_wallet(wallet_doctype, wallet_name, c2b_name, *, commit=T
 		c2b_name,
 		update_modified=True,
 	)
+
+	c2b_update = {
+		"custom_songa_reference_doctype": wallet_doctype,
+		"custom_songa_reference_name": wallet_name,
+	}
+	sales_invoice_name = _find_sales_invoice_for_wallet(wallet_doctype, wallet_name)
+	if sales_invoice_name:
+		c2b_update["billrefnumber"] = sales_invoice_name
+		si_customer = frappe.db.get_value("Sales Invoice", sales_invoice_name, "customer")
+		if si_customer and not c2b.customer:
+			c2b_update["customer"] = si_customer
+
 	frappe.db.set_value(
 		"Mpesa C2B Payment Register",
 		c2b_name,
-		{
-			"custom_songa_reference_doctype": wallet_doctype,
-			"custom_songa_reference_name": wallet_name,
-			"submit_payment": 0,
-		},
+		c2b_update,
 		update_modified=False,
 	)
 	if commit:
@@ -1227,6 +1516,7 @@ def _link_mpesa_c2b_to_wallet(wallet_doctype, wallet_name, c2b_name, *, commit=T
 		"status": "success",
 		"message": f"Linked C2B payment {c2b_name} to {wallet_doctype} {wallet_name}.",
 		"c2b_name": c2b_name,
+		"sales_invoice": sales_invoice_name,
 	}
 
 
@@ -1237,7 +1527,7 @@ def link_mpesa_c2b_to_wallet(wallet_doctype, wallet_name, c2b_name):
 
 
 def link_and_complete_mpesa_c2b_recharge(wallet_doctype, wallet_name, c2b_name):
-	"""Link a C2B payment and run the Songa wallet complete path (JE + webhook)."""
+	"""Link a C2B payment and complete the wallet via SI Payment Entry + webhook."""
 	_link_mpesa_c2b_to_wallet(wallet_doctype, wallet_name, c2b_name, commit=False)
 	return process_mpesa_c2b_wallet_payment(wallet_doctype, wallet_name)
 
@@ -1270,7 +1560,7 @@ def unlink_mpesa_c2b_from_wallet(wallet_doctype, wallet_name):
 
 @frappe.whitelist(allow_guest=False)
 def process_mpesa_c2b_wallet_payment(wallet_doctype, wallet_name):
-	"""Complete a C2B-linked wallet recharge: status Completed, JE, webhook."""
+	"""Complete a C2B-linked wallet recharge: PE against SI, status Completed, webhook."""
 	if wallet_doctype not in ("Rental Days", "Energy KWh"):
 		frappe.throw("C2B wallet completion is only supported for Rental Days and Energy KWh.")
 
@@ -1293,6 +1583,7 @@ def process_mpesa_c2b_wallet_payment(wallet_doctype, wallet_name):
 			"message": "C2B wallet processing already completed.",
 			"wallet_name": wallet_name,
 			"c2b_name": c2b_name,
+			"sales_invoice": _find_sales_invoice_for_wallet(wallet_doctype, wallet_name),
 		}
 
 	if (
@@ -1310,9 +1601,9 @@ def process_mpesa_c2b_wallet_payment(wallet_doctype, wallet_name):
 
 	try:
 		frappe.db.savepoint("mpesa_c2b_wallet_payment")
-		_cancel_linked_c2b_payment_entry(c2b)
 
-		post_mpesa_wallet_journal_entry(c2b, wallet)
+		sales_invoice = create_wallet_c2b_sales_invoice(wallet_doctype, wallet_name)
+		payment_entry_name = reconcile_c2b_to_sales_invoice(c2b_name, sales_invoice.name)
 
 		if wallet.status != "Completed":
 			frappe.db.set_value(wallet_doctype, wallet_name, "status", "Completed")
@@ -1326,6 +1617,8 @@ def process_mpesa_c2b_wallet_payment(wallet_doctype, wallet_name):
 				"transaction_type": wallet.transaction_type,
 				"amount": wallet.amount,
 				"mpesa_c2b_payment_register": c2b.name,
+				"sales_invoice": sales_invoice.name,
+				"payment_entry": payment_entry_name,
 				"action_type": _mpesa_wallet_action_type(wallet_doctype),
 			}
 			if wallet_doctype == "Rental Days":
@@ -1354,6 +1647,8 @@ def process_mpesa_c2b_wallet_payment(wallet_doctype, wallet_name):
 		"message": "C2B wallet recharge completed.",
 		"wallet_name": wallet_name,
 		"c2b_name": c2b_name,
+		"sales_invoice": sales_invoice.name,
+		"payment_entry": payment_entry_name,
 	}
 
 

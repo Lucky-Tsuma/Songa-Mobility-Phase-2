@@ -319,9 +319,3 @@ def is_lease_payment_je(doc):
 		return False
 
 	return bool(_get_lease_payment_driver(doc, lease_settings["debit_account"]))
-
-
-def suppress_c2b_payment_entry_for_songa_wallet(doc, method=None):
-	"""Skip stock C2B Payment Entry creation when this C2B is linked to a Songa wallet."""
-	if doc.get("custom_songa_reference_name"):
-		doc.submit_payment = 0
