@@ -470,7 +470,7 @@ Returns repair details, workflow state, costs, and stock items if consumed.
 | Rental/Energy recharge via M-Pesa Express terminal completion | `Mpesa Express Request` | `Rental days recharge` / `Energy recharge` | `driver_id`, `mpesa_express_request`, `amount`, wallet id + quantity, updated wallet balance |
 | Rental/Energy recharge via linked M-Pesa C2B completion | `Mpesa C2B Payment Register` | `Rental days recharge` / `Energy recharge` | `driver_id`, `mpesa_c2b_payment_register`, `sales_invoice`, `payment_entry`, `amount`, wallet id + quantity, updated wallet balance |
 | Asset Repair completion/cancel sync | `Asset Repair Completion` | `Service Completed` / `Service Cancelled` | `asset_repair`, repair metadata, status fields |
-| Lease/commission accounting event hooks | `Commission Deduction Webhook` and related contexts | Varies by event | `payment_entry` or `journal_entry`, amount, driver/commission linkage |
+| Lease/commission accounting event hooks | `Commission Deduction Webhook` and related contexts | `Commission Deduction` | `payment_entry` or `journal_entry`, `is_lease_payment`, amount, driver/commission linkage |
 
 ### Example JSON payloads
 
@@ -585,7 +585,21 @@ Returns repair details, workflow state, costs, and stock items if consumed.
   "action_type": "Commission Deduction",
   "driver_id": "DRI-0001",
   "commission_balance": 2650.0,
+  "is_lease_payment": false,
   "payment_entry": "ACC-PAY-2026-00109",
+  "amount": 1500.0
+}
+```
+
+#### 7) Lease payment Journal Entry hook
+
+```json
+{
+  "action_type": "Commission Deduction",
+  "driver_id": "DRI-0001",
+  "commission_balance": 2650.0,
+  "is_lease_payment": true,
+  "journal_entry": "ACC-JV-2026-00077",
   "amount": 1500.0
 }
 ```

@@ -177,7 +177,7 @@ def on_journal_entry_submit(doc, method):
 		)
 		return
 
-	_send_commission_deduction_event(doc, driver_id, commission_balance)
+	_send_commission_deduction_event(doc, driver_id, commission_balance, is_lease_payment=True)
 
 
 def on_purchase_invoice_validate(doc, method):
@@ -231,11 +231,12 @@ def on_stock_entry_validate(doc, method):
 		item.expense_account = expense_account
 
 
-def _send_commission_deduction_event(doc, driver_id, commission_balance):
+def _send_commission_deduction_event(doc, driver_id, commission_balance, *, is_lease_payment=False):
 	payload = {
 		"action_type": "Commission Deduction",
 		"driver_id": driver_id,
 		"commission_balance": commission_balance.get("balance"),
+		"is_lease_payment": bool(is_lease_payment),
 	}
 
 	if doc.doctype == "Payment Entry":
