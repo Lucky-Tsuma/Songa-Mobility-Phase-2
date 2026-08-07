@@ -217,7 +217,7 @@ Wallet M-Pesa recharges post GL through **ERPNext Payment Entry** against a **Sa
 | **C2B (`mpesa_c2b`)** | Sales Invoice at wallet create → Mpesa C2B Payment Register → Payment Entry against that SI | From C2B register, else Songa Customization Settings `mpesa_c2b_mode_of_payment` |
 
 - SI party is `Driver.customer`; line qty `1`, rate = wallet amount; SI is submitted via workflow action **Submit**.
-- For C2B without `transaction_id`, the API returns `sales_invoice` — use that name as the PayBill account reference (BillRef) so mpsa can auto-match; ops can still link and Complete on the desk later.
+- For C2B without `transaction_id`, the API returns `sales_invoice` — use that name as the PayBill account reference (BillRef) so mpsa can auto-match; when the C2B register is submitted against that SI, Songa links it to the wallet and completes the recharge automatically. Desk link/Complete remains available as a fallback.
 - Cancel reverses the Songa billing chain (Express: Express → PR → SI; C2B: PE → SI) and clears wallet↔C2B links.
 
 ---
@@ -367,7 +367,7 @@ Create a commission allocation ledger entry *(awaiting approval)*.
 
 - **Commission** — validates balance, submits wallet, creates Deduction ledger *(Pending)*, links wallet as **In Progress**; completes on approver **Approve**
 - **M-Pesa Express (`mpesa`)** — creates Sales Invoice + Payment Request + STK Express request; returns `"status": "pending"` with `mpesa_request`; wallet credits after STK confirms and Payment Entry is posted
-- **M-Pesa C2B** (no `transaction_id`) — creates wallet + Sales Invoice; returns `"status": "pending"` with `rental_day_id` / `energy_kwh_id` and `sales_invoice` *(use as PayBill BillRef)*; link a C2B Payment Register on the desk form, then Complete
+- **M-Pesa C2B** (no `transaction_id`) — creates wallet + Sales Invoice; returns `"status": "pending"` with `rental_day_id` / `energy_kwh_id` and `sales_invoice` *(use as PayBill BillRef)*; wallet completes automatically when the matching C2B Payment Register is submitted against that SI
 - **M-Pesa C2B** (with `transaction_id`) — creates wallet + Sales Invoice, matches C2B by `transid` + amount, allocates Payment Entry to the SI, completes wallet + webhook; returns `"status": "success"` with balances
 
 <br>
@@ -680,6 +680,7 @@ When an STK callback (or transaction-status query) sets **Mpesa Express Request*
 | Asset Repair | `validate`, `on_update` | Validation + Songa sync |
 | Payment Entry | `on_submit` | Lease / commission deduction webhook when applicable |
 | Journal Entry | `on_submit` | Lease payment JE → commission deduction webhook when applicable |
+| Mpesa C2B Payment Register | `on_submit` | Auto-link/complete pending wallet when C2B pays a wallet Sales Invoice |
 | Purchase Invoice / Stock Entry | `validate` | Branch and cost-centre rules |
 
 Client scripts in `public/js/` extend Driver, Mpesa Express Request, Rental Days / Energy KWh *(C2B link dialog)*, Payment Entry, Sales/Purchase documents, Stock Entry / Asset Repair, and Journal Entry forms.

@@ -140,6 +140,21 @@ def on_driver_insert(doc, method):
 		frappe.throw("Failed to create linked Supplier/Customer. Please try again.")
 
 
+def on_mpesa_c2b_payment_register_submit(doc, method):
+	"""Auto-link/complete In Progress wallets when C2B pays a wallet Sales Invoice."""
+	c2b_name = doc.name
+
+	def _complete_after_commit():
+		from songa_mobility_phase_2.songa_app_integration.utils.utils import (
+			complete_pending_wallet_for_c2b,
+		)
+
+		complete_pending_wallet_for_c2b(c2b_name)
+
+	# After commit so mpsa PE + C2B submit are durable; runs in-process (no worker needed).
+	frappe.db.after_commit.add(_complete_after_commit)
+
+
 def on_payment_entry_submit(doc, method):
 	if not (doc.payment_type == "Pay" and doc.party_type == "Supplier" and doc.party):
 		return

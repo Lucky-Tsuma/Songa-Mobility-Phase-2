@@ -1,4 +1,5 @@
 import json
+import re
 
 import frappe
 from erpnext.accounts.party import get_party_account
@@ -649,6 +650,107 @@ def _find_sales_invoice_for_wallet(wallet_doctype, wallet_name):
 		limit=1,
 	)
 	return invoices[0] if invoices else None
+
+
+def _parse_wallet_from_si_remarks(remarks):
+	"""Return (wallet_doctype, wallet_name) from Sales Invoice remarks marker."""
+	if not remarks:
+		return None, None
+	match = re.search(r"Songa Wallet\|(Rental Days|Energy KWh)\|([^\s|]+)", str(remarks))
+	if not match:
+		return None, None
+	return match.group(1), match.group(2)
+
+
+def _find_wallet_for_sales_invoice(sales_invoice_name):
+	if not sales_invoice_name or not frappe.db.exists("Sales Invoice", sales_invoice_name):
+		return None, None
+	remarks = frappe.db.get_value("Sales Invoice", sales_invoice_name, "remarks")
+	wallet_doctype, wallet_name = _parse_wallet_from_si_remarks(remarks)
+	if not wallet_doctype or not wallet_name:
+		return None, None
+	if not frappe.db.exists(wallet_doctype, wallet_name):
+		return None, None
+	return wallet_doctype, wallet_name
+
+
+def _resolve_sales_invoice_from_c2b(c2b):
+	"""Resolve Sales Invoice from C2B BillRef or linked Payment Entry references."""
+	billref = c2b.get("billrefnumber")
+	if billref and frappe.db.exists("Sales Invoice", billref):
+		return billref
+
+	pe_name = c2b.get("payment_entry")
+	if pe_name and frappe.db.exists("Payment Entry", pe_name):
+		refs = frappe.get_all(
+			"Payment Entry Reference",
+			filters={
+				"parent": pe_name,
+				"reference_doctype": "Sales Invoice",
+			},
+			pluck="reference_name",
+			order_by="idx asc",
+		)
+		for ref in refs:
+			if ref and frappe.db.exists("Sales Invoice", ref):
+				return ref
+	return None
+
+
+def complete_pending_wallet_for_c2b(c2b_name):
+	"""
+	When a C2B payment is submitted against a wallet Sales Invoice (BillRef = SI),
+	link the C2B to the pending wallet and mark it Completed + webhook.
+
+	Used after mpsa auto-reconciles PayBill payments that use the SI name as BillRef.
+	"""
+	if not c2b_name:
+		return
+
+	try:
+		c2b = frappe.get_doc("Mpesa C2B Payment Register", c2b_name)
+		if c2b.docstatus != 1:
+			return
+
+		linked_doctype, linked_name = _c2b_linked_wallet(c2b_name)
+		if linked_doctype and linked_name:
+			wallet = frappe.get_doc(linked_doctype, linked_name)
+			if wallet.status == "Completed":
+				return
+			if wallet.status == "In Progress":
+				process_mpesa_c2b_wallet_payment(linked_doctype, linked_name)
+			return
+
+		sales_invoice_name = _resolve_sales_invoice_from_c2b(c2b)
+		if not sales_invoice_name:
+			return
+
+		wallet_doctype, wallet_name = _find_wallet_for_sales_invoice(sales_invoice_name)
+		if not wallet_doctype:
+			return
+
+		wallet = frappe.get_doc(wallet_doctype, wallet_name)
+		if wallet.docstatus != 1 or wallet.transaction_type != "Recharge":
+			return
+		if wallet.status == "Completed":
+			return
+		if wallet.status != "In Progress":
+			return
+		if wallet.get("driver_commission_ledger") or wallet.get("mpesa_express_request"):
+			return
+		existing_c2b = wallet.get("mpesa_c2b_payment_register")
+		if existing_c2b and existing_c2b != c2b_name:
+			return
+
+		if not existing_c2b:
+			_link_mpesa_c2b_to_wallet(wallet_doctype, wallet_name, c2b_name, commit=False)
+
+		process_mpesa_c2b_wallet_payment(wallet_doctype, wallet_name)
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			f"Auto-complete C2B wallet for {c2b_name} failed",
+		)
 
 
 def create_wallet_c2b_sales_invoice(wallet_doctype, wallet_name):

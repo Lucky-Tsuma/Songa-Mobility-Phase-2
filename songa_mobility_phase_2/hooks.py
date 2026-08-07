@@ -172,6 +172,12 @@ doc_events = {
 	"Stock Entry": {
 		"validate": "songa_mobility_phase_2.songa_app_integration.events.events.on_stock_entry_validate",
 	},
+	"Mpesa C2B Payment Register": {
+		"on_submit": (
+			"songa_mobility_phase_2.songa_app_integration.events.events"
+			".on_mpesa_c2b_payment_register_submit"
+		),
+	},
 }
 
 # Scheduled Tasks

@@ -432,8 +432,8 @@ def recharge_rental_days():
 				"status": "pending",
 				"message": (
 					"Rental days recharge created. Use the sales_invoice name as the PayBill "
-					"account reference, then link the M-Pesa C2B Payment Register on the document "
-					"to complete the recharge."
+					"account reference; the wallet completes automatically when the C2B payment "
+					"is submitted against that invoice."
 				),
 				"rental_day_id": rental_days.name,
 				"sales_invoice": sales_invoice.name,
@@ -636,8 +636,8 @@ def recharge_kwh():
 				"status": "pending",
 				"message": (
 					"Energy KWh recharge created. Use the sales_invoice name as the PayBill "
-					"account reference, then link the M-Pesa C2B Payment Register on the document "
-					"to complete the recharge."
+					"account reference; the wallet completes automatically when the C2B payment "
+					"is submitted against that invoice."
 				),
 				"energy_kwh_id": energy_kwh.name,
 				"sales_invoice": sales_invoice.name,
