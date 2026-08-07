@@ -6,7 +6,9 @@ import frappe
 from frappe.model.workflow import apply_workflow
 
 from ..utils.utils import (
-	_clear_c2b_wallet_backref,
+	_find_sales_invoice_for_wallet,
+	create_wallet_c2b_sales_invoice,
+	create_wallet_mpesa_express_request,
 	find_eligible_c2b_by_transid,
 	get_commission_balance_by_driver,
 	get_energy_kwh_balance_by_driver,
@@ -151,21 +153,26 @@ RECHARGE_ACCOUNT_FIELDS = {
 			"battery_swap_commission_debit",
 			"battery_swap_commission_credit",
 		),
-		"mpesa": ("battery_swap_mpesa_debit", "battery_swap_mpesa_credit"),
 	},
 	"rental_recharge": {
 		"commission": (
 			"rental_recharge_commission_debit",
 			"rental_recharge_commission_credit",
 		),
-		"mpesa": ("rental_recharge_mpesa_debit", "rental_recharge_mpesa_credit"),
 	},
 }
 
 
 def _validate_recharge_account_settings(product, payment_method):
-	"""Ensure Songa Customization Settings has debit/credit accounts for the recharge path."""
-	fields = RECHARGE_ACCOUNT_FIELDS.get(product, {}).get(payment_method)
+	if payment_method == "mpesa":
+		item_field = "rental_recharge_item" if product == "rental_recharge" else "battery_swap_item"
+		fields = ("mpesa_express_mode_of_payment", "payment_gateway_account", item_field)
+	elif payment_method == "mpesa_c2b":
+		item_field = "rental_recharge_item" if product == "rental_recharge" else "battery_swap_item"
+		fields = (item_field,)
+	else:
+		fields = RECHARGE_ACCOUNT_FIELDS.get(product, {}).get(payment_method)
+
 	if not fields:
 		return None
 
@@ -178,9 +185,7 @@ def _validate_recharge_account_settings(product, payment_method):
 	frappe.local.response["http_status_code"] = 500
 	return {
 		"status": "error",
-		"message": (
-			"Please set the following accounts on Songa Customization Settings: " + ", ".join(labels)
-		),
+		"message": ("Please set the following fields on Songa Customization Settings: " + ", ".join(labels)),
 	}
 
 
@@ -280,7 +285,7 @@ def recharge_rental_days():
 
 		account_settings_error = _validate_recharge_account_settings(
 			"rental_recharge",
-			"mpesa" if payment_method == "mpesa_c2b" else payment_method,
+			payment_method,
 		)
 		if account_settings_error:
 			return account_settings_error
@@ -342,15 +347,6 @@ def recharge_rental_days():
 				frappe.local.response["http_status_code"] = 400
 				return {"status": "error", "message": "Invalid phone number"}
 
-			payment_gateway = frappe.get_single("Songa Customization Settings").stk_push_payment_gateway
-
-			if not payment_gateway:
-				frappe.local.response["http_status_code"] = 500
-				return {
-					"status": "error",
-					"message": "Please select the payment gateway on Songa Customization Settings",
-				}
-
 		try:
 			frappe.db.savepoint("recharge_rental_days")
 
@@ -386,31 +382,23 @@ def recharge_rental_days():
 				# Rental days have been saved as draft, will be submitted later after payment is confirmed.
 				# Use workflow handlers to check payment status and submit rental days
 				frappe.set_value("Rental Days", rental_days.name, "status", "In Progress")
-				mpesa_express_request = frappe.get_doc(
-					{
-						"doctype": "Mpesa Express Request",
-						"phone_number": phone_number,
-						"payment_gateway": payment_gateway,
-						"reference_doctype": "Rental Days",
-						"reference_name": rental_days.name,
-						"transaction_title": "Rental days recharge",
-						"transaction_description": f"Rental days recharge for driver {driver_id}, via Mpesa STK Push",
-						"currency": "KES",
-						"amount": amount,
-					}
+				billing_docs = create_wallet_mpesa_express_request(
+					"Rental Days",
+					rental_days.name,
+					phone_number=phone_number,
 				)
-				mpesa_express_request.insert()
-				mpesa_express_request.submit()
+				mpesa_express_request = billing_docs["mpesa_express_request"]
 
 				frappe.set_value(
 					"Rental Days",
 					rental_days.name,
 					"mpesa_express_request",
-					mpesa_express_request.name,
+					mpesa_express_request,
 				)
 
 			elif payment_method == "mpesa_c2b":
 				frappe.set_value("Rental Days", rental_days.name, "status", "In Progress")
+				sales_invoice = create_wallet_c2b_sales_invoice("Rental Days", rental_days.name)
 				if c2b_name:
 					link_and_complete_mpesa_c2b_recharge("Rental Days", rental_days.name, c2b_name)
 
@@ -425,7 +413,7 @@ def recharge_rental_days():
 			return {
 				"status": "pending",
 				"message": "M-Pesa payment initiated. Rental days will be recharged once payment is confirmed.",
-				"mpesa_request": mpesa_express_request.name,
+				"mpesa_request": mpesa_express_request,
 			}
 
 		if payment_method == "mpesa_c2b":
@@ -434,6 +422,7 @@ def recharge_rental_days():
 					"status": "success",
 					"message": "Rental days recharged successfully via M-Pesa C2B",
 					"rental_day_id": rental_days.name,
+					"sales_invoice": sales_invoice.name,
 					"mpesa_c2b_payment_register": c2b_name,
 					"total_rental_days_balance": get_rental_days_balance_by_driver(driver_id=driver_id).get(
 						"total_rental_days", 0
@@ -442,10 +431,12 @@ def recharge_rental_days():
 			return {
 				"status": "pending",
 				"message": (
-					"Rental days recharge created. Link an M-Pesa C2B Payment Register "
-					"on the document to complete the recharge."
+					"Rental days recharge created. Use the sales_invoice name as the PayBill "
+					"account reference, then link the M-Pesa C2B Payment Register on the document "
+					"to complete the recharge."
 				),
 				"rental_day_id": rental_days.name,
+				"sales_invoice": sales_invoice.name,
 			}
 
 		if payment_method == "commission":
@@ -503,7 +494,7 @@ def recharge_kwh():
 
 		account_settings_error = _validate_recharge_account_settings(
 			"battery_swap",
-			"mpesa" if payment_method == "mpesa_c2b" else payment_method,
+			payment_method,
 		)
 		if account_settings_error:
 			return account_settings_error
@@ -565,15 +556,6 @@ def recharge_kwh():
 				frappe.local.response["http_status_code"] = 400
 				return {"status": "error", "message": "Invalid phone number"}
 
-			payment_gateway = frappe.get_single("Songa Customization Settings").stk_push_payment_gateway
-
-			if not payment_gateway:
-				frappe.local.response["http_status_code"] = 500
-				return {
-					"status": "error",
-					"message": "Please select the payment gateway on Songa Customization Settings",
-				}
-
 		try:
 			frappe.db.savepoint("recharge_kwh")
 
@@ -607,31 +589,23 @@ def recharge_kwh():
 
 			elif payment_method == "mpesa":
 				frappe.set_value("Energy KWh", energy_kwh.name, "status", "In Progress")
-				mpesa_express_request = frappe.get_doc(
-					{
-						"doctype": "Mpesa Express Request",
-						"phone_number": phone_number,
-						"payment_gateway": payment_gateway,
-						"reference_doctype": "Energy KWh",
-						"reference_name": energy_kwh.name,
-						"transaction_title": "Energy KWh recharge",
-						"transaction_description": f"Energy KWh recharge for driver {driver_id}, via Mpesa STK Push",
-						"currency": "KES",
-						"amount": amount,
-					}
+				billing_docs = create_wallet_mpesa_express_request(
+					"Energy KWh",
+					energy_kwh.name,
+					phone_number=phone_number,
 				)
-				mpesa_express_request.insert()
-				mpesa_express_request.submit()
+				mpesa_express_request = billing_docs["mpesa_express_request"]
 
 				frappe.set_value(
 					"Energy KWh",
 					energy_kwh.name,
 					"mpesa_express_request",
-					mpesa_express_request.name,
+					mpesa_express_request,
 				)
 
 			elif payment_method == "mpesa_c2b":
 				frappe.set_value("Energy KWh", energy_kwh.name, "status", "In Progress")
+				sales_invoice = create_wallet_c2b_sales_invoice("Energy KWh", energy_kwh.name)
 				if c2b_name:
 					link_and_complete_mpesa_c2b_recharge("Energy KWh", energy_kwh.name, c2b_name)
 
@@ -645,7 +619,7 @@ def recharge_kwh():
 			return {
 				"status": "pending",
 				"message": "M-Pesa payment initiated. Energy KWh will be recharged once payment is confirmed.",
-				"mpesa_request": mpesa_express_request.name,
+				"mpesa_request": mpesa_express_request,
 			}
 
 		if payment_method == "mpesa_c2b":
@@ -654,16 +628,19 @@ def recharge_kwh():
 					"status": "success",
 					"message": "Energy kWh recharged successfully via M-Pesa C2B",
 					"energy_kwh_id": energy_kwh.name,
+					"sales_invoice": sales_invoice.name,
 					"mpesa_c2b_payment_register": c2b_name,
 					"kwh_balance": get_energy_kwh_balance_by_driver(driver_id=driver_id).get("total_kwh", 0),
 				}
 			return {
 				"status": "pending",
 				"message": (
-					"Energy KWh recharge created. Link an M-Pesa C2B Payment Register "
-					"on the document to complete the recharge."
+					"Energy KWh recharge created. Use the sales_invoice name as the PayBill "
+					"account reference, then link the M-Pesa C2B Payment Register on the document "
+					"to complete the recharge."
 				),
 				"energy_kwh_id": energy_kwh.name,
+				"sales_invoice": sales_invoice.name,
 			}
 
 		if payment_method == "commission":
@@ -880,19 +857,37 @@ def _cancel_document(doctype, document_id, id_field):
 			mpesa_express_request = frappe.get_doc("Mpesa Express Request", doc.mpesa_express_request)
 			mpesa_express_request.flags.ignore_links = True
 			mpesa_express_request.cancel()
+			if mpesa_express_request.reference_doctype == "Payment Request":
+				payment_request = frappe.get_doc("Payment Request", mpesa_express_request.reference_name)
+				if payment_request.docstatus == 1:
+					payment_request.flags.ignore_links = True
+					payment_request.flags.ignore_permissions = True
+					payment_request.cancel()
+				if payment_request.reference_doctype == "Sales Invoice":
+					sales_invoice = frappe.get_doc("Sales Invoice", payment_request.reference_name)
+					if sales_invoice.docstatus == 1:
+						sales_invoice.flags.ignore_links = True
+						sales_invoice.flags.ignore_permissions = True
+						sales_invoice.cancel()
 		elif doc.get("mpesa_c2b_payment_register"):
 			c2b_name = doc.mpesa_c2b_payment_register
-			je_name = frappe.db.get_value(
-				"Mpesa C2B Payment Register",
-				c2b_name,
-				"custom_songa_journal_entry",
-			)
-			if je_name:
-				journal_entry = frappe.get_doc("Journal Entry", je_name)
-				if journal_entry.docstatus == 1:
-					journal_entry.flags.ignore_links = True
-					journal_entry.cancel()
-			_clear_c2b_wallet_backref(c2b_name)
+			sales_invoice_name = _find_sales_invoice_for_wallet(doctype, doc.name)
+			payment_entry_name = frappe.db.get_value("Mpesa C2B Payment Register", c2b_name, "payment_entry")
+			if payment_entry_name:
+				pe_docstatus = frappe.db.get_value("Payment Entry", payment_entry_name, "docstatus")
+				if pe_docstatus == 1:
+					payment_entry = frappe.get_doc("Payment Entry", payment_entry_name)
+					payment_entry.flags.ignore_links = True
+					payment_entry.flags.ignore_permissions = True
+					payment_entry.cancel()
+
+			if sales_invoice_name:
+				si_docstatus = frappe.db.get_value("Sales Invoice", sales_invoice_name, "docstatus")
+				if si_docstatus == 1:
+					sales_invoice = frappe.get_doc("Sales Invoice", sales_invoice_name)
+					sales_invoice.flags.ignore_links = True
+					sales_invoice.flags.ignore_permissions = True
+					sales_invoice.cancel()
 
 	except Exception:
 		_rollback_savepoint(savepoint)
