@@ -198,8 +198,8 @@ Custom fields and client scripts ship via fixtures for:
 <summary><strong>Click to expand full list</strong></summary>
 
 - **Driver** — supplier/transporter link for commission GL balance; branch/cost center for accounting dimensions
-- **Mpesa Express Request** — wallet-linked STK requests; auto-process wallet on terminal STK status; desk Process / Retry / Reset for Abandoned retries
-- **Mpesa C2B Payment Register** — PayBill/Till register; standard mpsa PE against Sales Invoice for wallet recharges; optional Songa link/processed fields for desk ops
+- **Mpesa Express Request** — wallet-linked STK requests; auto-process wallet on terminal STK status; desk Process Wallet for manual re-sync
+- **Mpesa C2B Payment Register** — PayBill/Till register; standard mpsa PE against Sales Invoice for wallet recharges
 - **Asset** / **Asset Repair** — Songa repair ID, asset/severity type, trike registration, workflow state
 - **Asset Repair Consumed Item** — UOM fetch on stock lines
 - **Payment Entry**, **Journal Entry**, **Purchase Invoice**, **Purchase Order**, **Sales Invoice**, **Stock Entry** — branch/cost-centre and accounting hooks
@@ -394,7 +394,7 @@ Same as `recharge_rental_days`, but use `kwh` *(float)* instead of `no_of_days`.
 |-------|:--------:|
 | `rental_day_id` / `energy_kwh_id` | ✅ |
 
-Cancels the wallet document and reverses linked commission ledger, M-Pesa Express chain *(Express → Payment Request → Sales Invoice)*, or C2B billing *(Payment Entry → Sales Invoice)* and clears C2B back-references.
+Cancels the wallet document and reverses linked commission ledger, M-Pesa Express chain *(Express → Payment Request → Sales Invoice)*, or C2B billing *(Payment Entry → Sales Invoice)*.
 
 </details>
 
@@ -631,7 +631,7 @@ Whitelisted under `songa_mobility_phase_2.songa_app_integration.utils.utils`:
 | `allocate_commission` | Post approved allocation *(Journal Entry)* |
 | `deduct_commission` | Post approved deduction |
 | `process_mpesa_express_request` | Sync wallet status + webhook after STK terminal status *(PE already created on Payment Request path)* |
-| `retry_mpesa_wallet_processing` / `reset_mpesa_wallet_processing` | Desk retry / reset Abandoned Express wallet processing |
+| `retry_mpesa_wallet_processing` | Desk re-run of Express wallet status sync / webhook |
 | `search_mpesa_c2b_for_wallet_link` | Desk search for linkable C2B payments |
 | `link_mpesa_c2b_to_wallet` / `unlink_mpesa_c2b_from_wallet` | Desk link / unlink C2B ↔ wallet |
 | `process_mpesa_c2b_wallet_payment` | Complete C2B-linked wallet *(PE against SI + webhook)* |
@@ -650,12 +650,12 @@ Webhook desk helpers live under `songa_mobility_phase_2.songa_app_integration.ut
 
 | Schedule | Task |
 |----------|------|
-| Every **5 minutes** | `process_pending_mpesa_express_requests` — safety net for terminal Express requests still Pending *(auto-process on STK callback is primary)*; syncs wallet status + webhook on Completed, syncs Failed |
+| Every **5 minutes** | `process_pending_mpesa_express_requests` — safety net when Express is terminal but linked wallet status still differs; syncs wallet status + webhook |
 | Every **5 minutes** | `retry_failed_songa_webhooks` — retries Failed **Songa Webhook Log** rows *(max 5 attempts, then Abandoned)* |
 
 ### M-Pesa Express auto-processing
 
-When an STK callback (or transaction-status query) sets **Mpesa Express Request** to `Completed` / `Failed`, Songa immediately runs `process_mpesa_express_request` for wallet-linked requests *(Rental Days / Energy KWh)*. Payment Entry is created on the Payment Request path before wallet completion. This is required because mpsa writes status with `db.set_value` (no document events). Desk **Process Wallet** / **Retry** buttons remain for Abandoned or failed attempts.
+When an STK callback (or transaction-status query) sets **Mpesa Express Request** to `Completed` / `Failed`, Songa immediately runs `process_mpesa_express_request` for wallet-linked requests *(Rental Days / Energy KWh)*. Payment Entry is created on the Payment Request path before wallet completion. This is required because mpsa writes status with `db.set_value` (no document events). Desk **Process Wallet** remains for manual re-sync.
 
 ### Document events
 

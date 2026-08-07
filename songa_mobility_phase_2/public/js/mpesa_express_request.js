@@ -27,44 +27,17 @@ frappe.ui.form.on("Mpesa Express Request", {
 			return;
 		}
 
-		const processStatus = frm.doc.custom_songa_wallet_process_status || "Pending";
-		const isWalletReference = ["Rental Days", "Energy KWh"].includes(
-			frm.doc.reference_doctype
-		);
 		const isTerminal = ["Completed", "Failed"].includes(frm.doc.status);
-
-		if (!isWalletReference || !isTerminal || frm.doc.custom_songa_wallet_processed) {
+		if (!isTerminal) {
 			return;
 		}
 
-		if (processStatus === "Abandoned") {
-			frm.add_custom_button(__("Reset for Retry"), () => {
-				frappe.confirm(__("Reset this Abandoned wallet request to Pending?"), () => {
-					callMpesaWalletAction(
-						"songa_mobility_phase_2.songa_app_integration.utils.utils.reset_mpesa_wallet_processing",
-						frm,
-						__("M-Pesa wallet processing reset to Pending.")
-					);
-				});
-			});
-
-			frm.add_custom_button(__("Retry Now"), () => {
-				callMpesaWalletAction(
-					"songa_mobility_phase_2.songa_app_integration.utils.utils.retry_mpesa_wallet_processing",
-					frm,
-					__("M-Pesa wallet processing completed.")
-				);
-			});
-		}
-
-		if (processStatus === "Pending") {
-			frm.add_custom_button(__("Process Wallet"), () => {
-				callMpesaWalletAction(
-					"songa_mobility_phase_2.songa_app_integration.utils.utils.retry_mpesa_wallet_processing",
-					frm,
-					__("M-Pesa wallet processing completed.")
-				);
-			});
-		}
+		frm.add_custom_button(__("Process Wallet"), () => {
+			callMpesaWalletAction(
+				"songa_mobility_phase_2.songa_app_integration.utils.utils.retry_mpesa_wallet_processing",
+				frm,
+				__("M-Pesa wallet processing completed.")
+			);
+		});
 	},
 });

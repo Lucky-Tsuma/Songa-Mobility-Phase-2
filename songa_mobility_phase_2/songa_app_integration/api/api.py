@@ -6,7 +6,6 @@ import frappe
 from frappe.model.workflow import apply_workflow
 
 from ..utils.utils import (
-	_clear_c2b_wallet_backref,
 	_find_sales_invoice_for_wallet,
 	create_wallet_c2b_sales_invoice,
 	create_wallet_mpesa_express_request,
@@ -872,18 +871,6 @@ def _cancel_document(doctype, document_id, id_field):
 						sales_invoice.cancel()
 		elif doc.get("mpesa_c2b_payment_register"):
 			c2b_name = doc.mpesa_c2b_payment_register
-			# Historical C2B JE path: cancel JE if present; leave otherwise as-is.
-			je_name = frappe.db.get_value(
-				"Mpesa C2B Payment Register",
-				c2b_name,
-				"custom_songa_journal_entry",
-			)
-			if je_name:
-				journal_entry = frappe.get_doc("Journal Entry", je_name)
-				if journal_entry.docstatus == 1:
-					journal_entry.flags.ignore_links = True
-					journal_entry.cancel()
-
 			sales_invoice_name = _find_sales_invoice_for_wallet(doctype, doc.name)
 			payment_entry_name = frappe.db.get_value("Mpesa C2B Payment Register", c2b_name, "payment_entry")
 			if payment_entry_name:
@@ -901,8 +888,6 @@ def _cancel_document(doctype, document_id, id_field):
 					sales_invoice.flags.ignore_links = True
 					sales_invoice.flags.ignore_permissions = True
 					sales_invoice.cancel()
-
-			_clear_c2b_wallet_backref(c2b_name)
 
 	except Exception:
 		_rollback_savepoint(savepoint)

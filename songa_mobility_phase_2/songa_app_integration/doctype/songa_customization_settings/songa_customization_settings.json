@@ -22,10 +22,6 @@
   "battery_swap_commission_debit",
   "column_break_okwx",
   "battery_swap_commission_credit",
-  "mpesa_battery_swap_section",
-  "battery_swap_mpesa_debit",
-  "column_break_wegn",
-  "battery_swap_mpesa_credit",
   "section_break_mrpu",
   "battery_swap_item",
   "column_break_hopr",
@@ -34,10 +30,6 @@
   "rental_recharge_commission_debit",
   "column_break_ntnt",
   "rental_recharge_commission_credit",
-  "mpesa_rental_recharge_section",
-  "rental_recharge_mpesa_debit",
-  "column_break_plqj",
-  "rental_recharge_mpesa_credit",
   "section_break_btvu",
   "rental_recharge_item",
   "column_break_fnms",
@@ -121,32 +113,9 @@
    "options": "Account"
   },
   {
-   "fieldname": "mpesa_battery_swap_section",
-   "fieldtype": "Section Break",
-   "label": "Mpesa"
-  },
-  {
-   "fieldname": "battery_swap_mpesa_debit",
-   "fieldtype": "Link",
-   "label": "Debit Account",
-   "options": "Account",
-   "reqd": 1
-  },
-  {
-   "fieldname": "column_break_wegn",
-   "fieldtype": "Column Break"
-  },
-  {
    "fieldname": "battery_swap_tab",
    "fieldtype": "Tab Break",
    "label": "Battery Swap"
-  },
-  {
-   "fieldname": "battery_swap_mpesa_credit",
-   "fieldtype": "Link",
-   "label": "Credit Account",
-   "options": "Account",
-   "reqd": 1
   },
   {
    "fieldname": "commission_battery_swap_section",
@@ -194,29 +163,6 @@
   },
   {
    "fieldname": "rental_recharge_commission_credit",
-   "fieldtype": "Link",
-   "label": "Credit Account",
-   "options": "Account",
-   "reqd": 1
-  },
-  {
-   "fieldname": "mpesa_rental_recharge_section",
-   "fieldtype": "Section Break",
-   "label": "Mpesa"
-  },
-  {
-   "fieldname": "rental_recharge_mpesa_debit",
-   "fieldtype": "Link",
-   "label": "Debit Account",
-   "options": "Account",
-   "reqd": 1
-  },
-  {
-   "fieldname": "column_break_plqj",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "rental_recharge_mpesa_credit",
    "fieldtype": "Link",
    "label": "Credit Account",
    "options": "Account",
