@@ -542,15 +542,6 @@ def get_overall_balance(driver_id=None):
 		return {"status": "error", "message": str(e)}
 
 
-MAX_MPESA_WALLET_ATTEMPTS = 5
-MPESA_WALLET_RETRY_INTERVAL_MINUTES = 5
-
-MPESA_WALLET_ACCOUNT_FIELDS = {
-	"Energy KWh": ("battery_swap_mpesa_debit", "battery_swap_mpesa_credit"),
-	"Rental Days": ("rental_recharge_mpesa_debit", "rental_recharge_mpesa_credit"),
-}
-
-
 def _mpesa_wallet_action_type(reference_doctype):
 	if reference_doctype == "Rental Days":
 		return "Rental days recharge"
@@ -559,134 +550,445 @@ def _mpesa_wallet_action_type(reference_doctype):
 	return None
 
 
-def get_mpesa_wallet_accounts(reference_doctype):
-	"""Return debit/credit accounts for an M-Pesa wallet recharge Journal Entry."""
-	fields = MPESA_WALLET_ACCOUNT_FIELDS.get(reference_doctype)
-	if not fields:
-		frappe.throw(f"Unsupported M-Pesa wallet reference doctype: {reference_doctype}")
+def _get_wallet_item_field(wallet_doctype):
+	if wallet_doctype == "Rental Days":
+		return "rental_recharge_item"
+	if wallet_doctype == "Energy KWh":
+		return "battery_swap_item"
+	frappe.throw(f"Unsupported wallet doctype for M-Pesa Express billing: {wallet_doctype}")
 
+
+def _get_stk_payment_settings():
 	settings = frappe.get_single("Songa Customization Settings")
-	debit_account = settings.get(fields[0])
-	credit_account = settings.get(fields[1])
-	missing = [frappe.unscrub(field) for field in fields if not settings.get(field)]
+	required_fields = [
+		"mpesa_express_mode_of_payment",
+		"payment_gateway_account",
+	]
+	missing = [field for field in required_fields if not settings.get(field)]
 	if missing:
-		frappe.throw(
-			"Please set the following accounts on Songa Customization Settings: " + ", ".join(missing)
-		)
-
-	return debit_account, credit_account
+		labels = [frappe.unscrub(field) for field in missing]
+		frappe.throw("Please set the following fields on Songa Customization Settings: " + ", ".join(labels))
+	return settings
 
 
-def post_mpesa_wallet_journal_entry(payment_doc, reference_doc):
-	"""
-	Create and submit the Songa wallet Journal Entry for a completed M-Pesa payment.
+def submit_sales_invoice(invoice):
+	from frappe.model.workflow import apply_workflow
 
-	Supports Mpesa Express Request and Mpesa C2B Payment Register sources.
-	Idempotent: returns an existing linked JE if custom_songa_journal_entry is already set.
-	"""
-	source_doctype = payment_doc.doctype
-	if source_doctype not in ("Mpesa Express Request", "Mpesa C2B Payment Register"):
-		frappe.throw(f"Unsupported M-Pesa payment source: {source_doctype}")
+	return apply_workflow(invoice, "Submit")
 
-	existing_je = getattr(payment_doc, "custom_songa_journal_entry", None) or frappe.db.get_value(
-		source_doctype,
-		payment_doc.name,
-		"custom_songa_journal_entry",
-	)
-	if existing_je:
-		return existing_je
 
-	if source_doctype == "Mpesa Express Request" and payment_doc.status != "Completed":
-		frappe.throw("M-Pesa wallet Journal Entry can only be posted for Completed requests.")
+def _wallet_si_remarks(wallet_doctype, wallet_name):
+	return f"Songa Wallet|{wallet_doctype}|{wallet_name}"
 
-	reference_doctype = reference_doc.doctype
-	if reference_doctype not in MPESA_WALLET_ACCOUNT_FIELDS:
-		frappe.throw(f"Unsupported M-Pesa wallet reference doctype: {reference_doctype}")
 
-	driver = reference_doc.driver
-	if not driver or not frappe.db.exists("Driver", driver):
-		frappe.throw("Driver not found on the M-Pesa reference document.")
+def _create_sales_invoice_for_wallet_recharge(wallet_doc, *, item_code):
+	driver = frappe.get_doc("Driver", wallet_doc.driver)
+	if not driver.customer:
+		frappe.throw("Driver does not have an associated customer.")
 
-	supplier = frappe.db.get_value("Driver", driver, "transporter")
-	if not supplier:
-		frappe.throw("Driver does not have an associated supplier")
-
-	amount = reference_doc.amount
-	if not amount or amount <= 0:
-		frappe.throw("Amount must be greater than zero for M-Pesa wallet Journal Entry.")
-
-	company = reference_doc.company or frappe.defaults.get_user_default("company")
-	if not company:
-		frappe.throw("Company is required to post the M-Pesa wallet Journal Entry.")
-
-	debit_account, credit_account = get_mpesa_wallet_accounts(reference_doctype)
-
-	branch_and_cost_center_dict = get_branch_and_cost_center_by_supplier(supplier=supplier)
-	branch = branch_and_cost_center_dict.get("branch", "")
-	cost_center = branch_and_cost_center_dict.get("cost_center", "")
-	branch_cost_center_fields = {
-		**({"branch": branch} if branch else {}),
-		**({"cost_center": cost_center} if cost_center else {}),
-	}
-
-	driver_name = frappe.db.get_value("Driver", driver, "full_name") or driver
-	if source_doctype == "Mpesa Express Request":
-		cheque_no = payment_doc.transaction_id or payment_doc.name
-	else:
-		cheque_no = payment_doc.transid or payment_doc.name
-
-	user_remark = (
-		f"M-Pesa wallet recharge for driver {driver_name} - "
-		f"{reference_doctype} {reference_doc.name} - {source_doctype} {payment_doc.name}"
-	)
-
-	journal_entry = frappe.get_doc(
+	item_uom = frappe.db.get_value("Item", item_code, "stock_uom") or "Nos"
+	invoice = frappe.get_doc(
 		{
-			"doctype": "Journal Entry",
+			"doctype": "Sales Invoice",
+			"customer": driver.customer,
+			"company": wallet_doc.company,
 			"posting_date": frappe.utils.nowdate(),
-			"voucher_type": "Journal Entry",
-			"company": company,
-			"cheque_no": cheque_no,
-			"cheque_date": frappe.utils.nowdate(),
-			"user_remark": user_remark,
-			"accounts": [
+			"due_date": frappe.utils.nowdate(),
+			"is_return": 0,
+			"remarks": _wallet_si_remarks(wallet_doc.doctype, wallet_doc.name),
+			"items": [
 				{
-					"account": debit_account,
-					"debit_in_account_currency": amount,
-					"credit_in_account_currency": 0,
-					**branch_cost_center_fields,
-					"is_advance": "No",
-				},
-				{
-					"account": credit_account,
-					"debit_in_account_currency": 0,
-					"credit_in_account_currency": amount,
-					"party_type": "Supplier",
-					"is_advance": "No",
-				},
+					"item_code": item_code,
+					"qty": 1,
+					"uom": item_uom,
+					"rate": wallet_doc.amount,
+				}
 			],
 		}
 	)
+	invoice.insert(ignore_permissions=True)
+	return submit_sales_invoice(invoice)
 
-	try:
-		frappe.db.savepoint("mpesa_wallet_journal_entry")
-		journal_entry.insert()
-		journal_entry.submit()
-		values = {"custom_songa_journal_entry": journal_entry.name}
-		if source_doctype == "Mpesa Express Request":
-			values["is_reconciled"] = 1
+
+def _find_sales_invoice_for_wallet(wallet_doctype, wallet_name):
+	"""Resolve the wallet Sales Invoice from C2B/PE links or remarks marker."""
+	wallet = frappe.get_doc(wallet_doctype, wallet_name)
+	c2b_name = wallet.get("mpesa_c2b_payment_register")
+	if c2b_name:
+		c2b = frappe.db.get_value(
+			"Mpesa C2B Payment Register",
+			c2b_name,
+			["payment_entry", "billrefnumber"],
+			as_dict=True,
+		)
+		if c2b:
+			if c2b.payment_entry and frappe.db.exists("Payment Entry", c2b.payment_entry):
+				refs = frappe.get_all(
+					"Payment Entry Reference",
+					filters={
+						"parent": c2b.payment_entry,
+						"reference_doctype": "Sales Invoice",
+					},
+					pluck="reference_name",
+				)
+				for ref in refs:
+					if ref:
+						return ref
+			if c2b.billrefnumber and frappe.db.exists("Sales Invoice", c2b.billrefnumber):
+				return c2b.billrefnumber
+
+	marker = _wallet_si_remarks(wallet_doctype, wallet_name)
+	invoices = frappe.get_all(
+		"Sales Invoice",
+		filters={
+			"remarks": ["like", f"%{marker}%"],
+			"docstatus": ["<", 2],
+		},
+		pluck="name",
+		order_by="creation desc",
+		limit=1,
+	)
+	return invoices[0] if invoices else None
+
+
+def create_wallet_c2b_sales_invoice(wallet_doctype, wallet_name):
+	"""Create (or return existing) Sales Invoice for a C2B wallet recharge."""
+	if wallet_doctype not in ("Rental Days", "Energy KWh"):
+		frappe.throw("C2B wallet billing is only supported for Rental Days and Energy KWh.")
+
+	existing = _find_sales_invoice_for_wallet(wallet_doctype, wallet_name)
+	if existing:
+		return frappe.get_doc("Sales Invoice", existing)
+
+	wallet_doc = frappe.get_doc(wallet_doctype, wallet_name)
+	if wallet_doc.docstatus != 1:
+		frappe.throw("Wallet document must be submitted.")
+	if wallet_doc.transaction_type != "Recharge":
+		frappe.throw("Only Recharge documents can be billed through M-Pesa C2B.")
+
+	settings = frappe.get_single("Songa Customization Settings")
+	item_field = _get_wallet_item_field(wallet_doctype)
+	item_code = settings.get(item_field)
+	if not item_code:
+		frappe.throw(
+			"Please set the following field on Songa Customization Settings: " + frappe.unscrub(item_field)
+		)
+
+	return _create_sales_invoice_for_wallet_recharge(wallet_doc, item_code=item_code)
+
+
+def _pe_allocates_to_sales_invoice(payment_entry_name, sales_invoice_name, amount=None):
+	if not payment_entry_name or not frappe.db.exists("Payment Entry", payment_entry_name):
+		return False
+	pe = frappe.get_doc("Payment Entry", payment_entry_name)
+	if pe.docstatus != 1:
+		return False
+	allocated = 0.0
+	for ref in pe.references:
+		if ref.reference_doctype == "Sales Invoice" and ref.reference_name == sales_invoice_name:
+			allocated += frappe.utils.flt(ref.allocated_amount)
+	if allocated <= 0:
+		return False
+	if amount is not None and abs(allocated - frappe.utils.flt(amount)) > 0.01:
+		return False
+	return True
+
+
+def _allocate_existing_pe_to_sales_invoice(payment_entry_name, sales_invoice):
+	"""Allocate an existing submitted PE against the Sales Invoice when possible."""
+	from erpnext.accounts.party import get_party_account
+
+	pe = frappe.get_doc("Payment Entry", payment_entry_name)
+	if pe.docstatus != 1:
+		frappe.throw(f"Payment Entry {payment_entry_name} is not submitted.")
+
+	if _pe_allocates_to_sales_invoice(payment_entry_name, sales_invoice.name):
+		return payment_entry_name
+
+	unallocated = frappe.utils.flt(pe.unallocated_amount)
+	if unallocated <= 0:
+		frappe.throw(
+			f"Payment Entry {payment_entry_name} has no unallocated amount to apply to "
+			f"Sales Invoice {sales_invoice.name}."
+		)
+
+	sales_invoice.reload()
+	reconcile_doc = frappe.new_doc("Payment Reconciliation")
+	reconcile_doc.party_type = "Customer"
+	reconcile_doc.party = sales_invoice.customer
+	reconcile_doc.company = sales_invoice.company
+	reconcile_doc.receivable_payable_account = get_party_account(
+		"Customer", sales_invoice.customer, sales_invoice.company
+	)
+
+	invoice_data = {
+		"invoice_type": "Sales Invoice",
+		"invoice_number": sales_invoice.name,
+		"invoice_date": sales_invoice.posting_date,
+		"amount": sales_invoice.grand_total,
+		"outstanding_amount": sales_invoice.outstanding_amount,
+		"currency": sales_invoice.currency,
+		"exchange_rate": 0,
+	}
+	payment_data = {
+		"reference_type": "Payment Entry",
+		"reference_name": pe.name,
+		"posting_date": pe.posting_date,
+		"amount": pe.unallocated_amount,
+		"unallocated_amount": pe.unallocated_amount,
+		"difference_amount": 0,
+		"currency": pe.paid_from_account_currency or pe.paid_to_account_currency,
+		"exchange_rate": 0,
+	}
+	args = {"invoices": [invoice_data], "payments": [payment_data]}
+	reconcile_doc.append("invoices", invoice_data)
+	reconcile_doc.append("payments", payment_data)
+	reconcile_doc.allocate_entries(args)
+	reconcile_doc.reconcile()
+
+	sales_invoice.reload()
+	if (
+		not _pe_allocates_to_sales_invoice(payment_entry_name, sales_invoice.name)
+		and frappe.utils.flt(sales_invoice.outstanding_amount) > 0.01
+	):
+		frappe.throw(
+			f"Could not allocate Payment Entry {payment_entry_name} to Sales Invoice {sales_invoice.name}."
+		)
+	return payment_entry_name
+
+
+def reconcile_c2b_to_sales_invoice(c2b_name, sales_invoice_name):
+	"""Ensure C2B has a Payment Entry allocated to the wallet Sales Invoice. This is done via the Payment Entry workflow."""
+	from frappe_mpsa_payments.frappe_mpsa_payments.api.payment_entry import create_payment_entry
+
+	c2b = frappe.get_doc("Mpesa C2B Payment Register", c2b_name)
+	sales_invoice = frappe.get_doc("Sales Invoice", sales_invoice_name)
+
+	if sales_invoice.docstatus != 1:
+		frappe.throw(f"Sales Invoice {sales_invoice_name} must be submitted.")
+
+	amount = frappe.utils.flt(c2b.transamount)
+	if (
+		abs(amount - frappe.utils.flt(sales_invoice.grand_total)) > 0.01
+		and frappe.utils.flt(sales_invoice.outstanding_amount) > 0.01
+	):
+		# Allow when SI outstanding matches payment (already partially paid elsewhere).
+		if abs(amount - frappe.utils.flt(sales_invoice.outstanding_amount)) > 0.01:
+			frappe.throw(
+				f"Amount mismatch: C2B transamount is {amount} but Sales Invoice "
+				f"outstanding is {sales_invoice.outstanding_amount}."
+			)
+
+	update_fields = {}
+	if not c2b.customer:
+		update_fields["customer"] = sales_invoice.customer
+	elif c2b.customer != sales_invoice.customer:
+		frappe.throw(
+			f"C2B customer {c2b.customer} does not match Sales Invoice customer {sales_invoice.customer}."
+		)
+	if not c2b.company:
+		update_fields["company"] = sales_invoice.company
+	if c2b.billrefnumber != sales_invoice.name:
+		update_fields["billrefnumber"] = sales_invoice.name
+	if update_fields:
+		frappe.db.set_value("Mpesa C2B Payment Register", c2b_name, update_fields, update_modified=False)
+		c2b.reload()
+
+	pe_name = c2b.payment_entry
+	if pe_name and frappe.db.exists("Payment Entry", pe_name):
+		pe_docstatus = frappe.db.get_value("Payment Entry", pe_name, "docstatus")
+		if pe_docstatus == 1:
+			if _pe_allocates_to_sales_invoice(pe_name, sales_invoice.name, amount):
+				return pe_name
+			# Prefer allocate-in-place when PE has unallocated amount.
+			unallocated = frappe.utils.flt(
+				frappe.db.get_value("Payment Entry", pe_name, "unallocated_amount")
+			)
+			if unallocated > 0:
+				return _allocate_existing_pe_to_sales_invoice(pe_name, sales_invoice)
+			# Wrong fully-allocated PE: cancel and recreate against this SI.
+			_cancel_linked_c2b_payment_entry(c2b)
+			frappe.db.set_value(
+				"Mpesa C2B Payment Register", c2b_name, "payment_entry", None, update_modified=False
+			)
+			c2b.reload()
+			pe_name = None
+		elif pe_docstatus == 0:
+			pe = frappe.get_doc("Payment Entry", pe_name)
+			pe.set("references", [])
+			pe.append(
+				"references",
+				{
+					"reference_doctype": "Sales Invoice",
+					"reference_name": sales_invoice.name,
+					"allocated_amount": amount,
+				},
+			)
+			pe.flags.ignore_permissions = True
+			pe.save()
+			pe.submit()
+			return pe.name
+		elif pe_docstatus == 2:
+			frappe.db.set_value(
+				"Mpesa C2B Payment Register", c2b_name, "payment_entry", None, update_modified=False
+			)
+			c2b.reload()
+			pe_name = None
+
+	if not pe_name:
+		mode_of_payment = c2b.mode_of_payment
+		if not mode_of_payment:
+			mode_of_payment = frappe.db.get_single_value(
+				"Songa Customization Settings", "mpesa_c2b_mode_of_payment"
+			)
+			if mode_of_payment:
+				frappe.db.set_value(
+					"Mpesa C2B Payment Register",
+					c2b_name,
+					"mode_of_payment",
+					mode_of_payment,
+					update_modified=False,
+				)
+				c2b.mode_of_payment = mode_of_payment
+
+		if not mode_of_payment:
+			frappe.throw(
+				f"Mode of Payment is required for Mpesa C2B Payment Register {c2b_name}. "
+				"Set it on the C2B record or on Songa Customization Settings "
+				"(Mpesa C2B Mode of Payment)."
+			)
+		if not c2b.company:
+			frappe.throw(f"Company is required on Mpesa C2B Payment Register {c2b_name}.")
+		if not c2b.customer:
+			frappe.throw(f"Customer is required on Mpesa C2B Payment Register {c2b_name}.")
+
+		# Prefer stock C2B submit path when register is still draft.
+		if c2b.docstatus == 0:
+			c2b.submit_payment = 1
+			c2b.flags.ignore_permissions = True
+			c2b.save()
+			c2b.submit()
+			c2b.reload()
+			if c2b.payment_entry:
+				return c2b.payment_entry
+
+		payment_entry = create_payment_entry(
+			c2b.company,
+			c2b.customer,
+			amount,
+			c2b.currency or sales_invoice.currency,
+			mode_of_payment,
+			"Customer",
+			c2b.posting_date,
+			c2b.name,
+			c2b.posting_date,
+			None,
+			1,
+			references=[
+				{
+					"reference_doctype": "Sales Invoice",
+					"reference_name": sales_invoice.name,
+					"allocated_amount": amount,
+				}
+			],
+		)
 		frappe.db.set_value(
-			source_doctype,
-			payment_doc.name,
-			values,
+			"Mpesa C2B Payment Register",
+			c2b_name,
+			"payment_entry",
+			payment_entry.name,
 			update_modified=False,
 		)
-		frappe.db.commit()
-	except Exception:
-		frappe.db.rollback(save_point="mpesa_wallet_journal_entry")
-		raise
+		return payment_entry.name
 
-	return journal_entry.name
+	return pe_name
+
+
+def _create_payment_request_for_wallet_recharge(*, sales_invoice, phone_number, settings):
+	gateway_account = frappe.get_doc("Payment Gateway Account", settings.payment_gateway_account)
+	if not gateway_account.payment_gateway:
+		frappe.throw("Payment Gateway is required on the selected Payment Gateway Account.")
+	if not gateway_account.payment_account:
+		frappe.throw("Payment Account is required on the selected Payment Gateway Account.")
+	if gateway_account.payment_channel and gateway_account.payment_channel != "Phone":
+		frappe.throw("Selected Payment Gateway Account must use Phone payment channel.")
+
+	payment_request = frappe.get_doc(
+		{
+			"doctype": "Payment Request",
+			"payment_request_type": "Inward",
+			"reference_doctype": "Sales Invoice",
+			"reference_name": sales_invoice.name,
+			"party_type": "Customer",
+			"party": sales_invoice.customer,
+			"party_name": sales_invoice.customer_name,
+			"company": sales_invoice.company,
+			"currency": sales_invoice.currency,
+			"grand_total": sales_invoice.outstanding_amount or sales_invoice.grand_total,
+			"outstanding_amount": sales_invoice.outstanding_amount or sales_invoice.grand_total,
+			"mode_of_payment": settings.mpesa_express_mode_of_payment,
+			"payment_gateway_account": settings.payment_gateway_account,
+			"payment_gateway": gateway_account.payment_gateway,
+			"payment_account": gateway_account.payment_account,
+			"payment_channel": gateway_account.payment_channel or "Phone",
+			"phone_number": phone_number,
+			"email_to": frappe.session.user,
+			"subject": f"Wallet recharge payment request for {sales_invoice.name}",
+			"mute_email": 1,
+		}
+	)
+	payment_request.insert(ignore_permissions=True)
+	payment_request.submit()
+	return payment_request
+
+
+def _find_mpesa_express_request_for_payment_request(payment_request_name):
+	requests = frappe.get_all(
+		"Mpesa Express Request",
+		filters={
+			"reference_doctype": "Payment Request",
+			"reference_name": payment_request_name,
+		},
+		fields=["name"],
+		order_by="creation desc",
+		limit=1,
+	)
+	if not requests:
+		frappe.throw(f"No Mpesa Express Request was created for Payment Request {payment_request_name}.")
+	return requests[0].name
+
+
+def create_wallet_mpesa_express_request(wallet_doctype, wallet_name, *, phone_number):
+	"""Create SI+PR and return the resulting Mpesa Express Request for a wallet recharge."""
+	if wallet_doctype not in ("Rental Days", "Energy KWh"):
+		frappe.throw("M-Pesa Express wallet billing is only supported for Rental Days and Energy KWh.")
+
+	wallet_doc = frappe.get_doc(wallet_doctype, wallet_name)
+	if wallet_doc.docstatus != 1:
+		frappe.throw("Wallet document must be submitted.")
+	if wallet_doc.transaction_type != "Recharge":
+		frappe.throw("Only Recharge documents can be billed through M-Pesa Express.")
+
+	settings = _get_stk_payment_settings()
+	item_field = _get_wallet_item_field(wallet_doctype)
+	item_code = settings.get(item_field)
+	if not item_code:
+		frappe.throw(
+			"Please set the following field on Songa Customization Settings: " + frappe.unscrub(item_field)
+		)
+
+	sales_invoice = _create_sales_invoice_for_wallet_recharge(wallet_doc, item_code=item_code)
+	payment_request = _create_payment_request_for_wallet_recharge(
+		sales_invoice=sales_invoice,
+		phone_number=phone_number,
+		settings=settings,
+	)
+	mpesa_express_request = _find_mpesa_express_request_for_payment_request(payment_request.name)
+	return {
+		"sales_invoice": sales_invoice.name,
+		"payment_request": payment_request.name,
+		"mpesa_express_request": mpesa_express_request,
+	}
 
 
 def _mpesa_songa_webhook_already_sent(
@@ -709,99 +1011,20 @@ def _mpesa_songa_webhook_already_sent(
 	)
 
 
-def _mark_mpesa_wallet_processed(payment_name, source_doctype="Mpesa Express Request"):
-	frappe.db.set_value(
-		source_doctype,
-		payment_name,
-		{
-			"custom_songa_wallet_processed": 1,
-			"custom_songa_wallet_process_status": "Processed",
-			"custom_songa_wallet_last_attempt_on": frappe.utils.now_datetime(),
-		},
-		update_modified=False,
-	)
-
-
-def record_mpesa_wallet_processing_failure(payment_name, source_doctype="Mpesa Express Request"):
-	"""Increment failed attempt count and abandon when the max is reached."""
-	attempt_count = (
-		frappe.db.get_value(
-			source_doctype,
-			payment_name,
-			"custom_songa_wallet_attempt_count",
-		)
-		or 0
-	) + 1
-
-	values = {
-		"custom_songa_wallet_attempt_count": attempt_count,
-		"custom_songa_wallet_last_attempt_on": frappe.utils.now_datetime(),
-		"custom_songa_wallet_process_status": (
-			"Abandoned" if attempt_count >= MAX_MPESA_WALLET_ATTEMPTS else "Pending"
-		),
-	}
-	frappe.db.set_value(
-		source_doctype,
-		payment_name,
-		values,
-		update_modified=False,
-	)
-	frappe.db.commit()
-	return values
-
-
-@frappe.whitelist(allow_guest=False)
-def reset_mpesa_wallet_processing(name):
-	"""Reset an Abandoned wallet request so the cron (or a manual retry) can pick it up."""
-	doc = frappe.get_doc("Mpesa Express Request", name)
-	process_status = getattr(doc, "custom_songa_wallet_process_status", None) or "Pending"
-
-	if process_status != "Abandoned":
-		frappe.throw("Only Abandoned M-Pesa wallet requests can be reset for retry.")
-
-	if getattr(doc, "custom_songa_wallet_processed", 0):
-		frappe.throw("This M-Pesa request is already marked as wallet-processed.")
-
-	frappe.db.set_value(
-		"Mpesa Express Request",
-		name,
-		{
-			"custom_songa_wallet_process_status": "Pending",
-			"custom_songa_wallet_attempt_count": 0,
-			"custom_songa_wallet_last_attempt_on": None,
-			"custom_songa_wallet_processed": 0,
-		},
-		update_modified=False,
-	)
-	frappe.db.commit()
-	return {
-		"status": "success",
-		"message": "M-Pesa wallet processing reset to Pending.",
-		"name": name,
-	}
-
-
 @frappe.whitelist(allow_guest=False)
 def retry_mpesa_wallet_processing(name):
-	"""Reset Abandoned state if needed, then process the wallet request once."""
+	"""Re-run wallet status sync / webhook for a terminal Express request."""
 	doc = frappe.get_doc("Mpesa Express Request", name)
-	process_status = getattr(doc, "custom_songa_wallet_process_status", None) or "Pending"
-
-	if getattr(doc, "custom_songa_wallet_processed", 0) or process_status == "Processed":
+	if doc.status not in ("Completed", "Failed"):
 		return {
-			"status": "success",
-			"message": "M-Pesa wallet processing already completed.",
+			"status": "error",
+			"message": "M-Pesa Express Request must be Completed or Failed.",
 			"name": name,
 		}
-
-	if process_status == "Abandoned":
-		reset_mpesa_wallet_processing(name)
-		doc.reload()
 
 	try:
 		process_mpesa_express_request(doc)
 	except Exception as e:
-		record_mpesa_wallet_processing_failure(name)
 		return {
 			"status": "error",
 			"message": str(e),
@@ -818,68 +1041,68 @@ def retry_mpesa_wallet_processing(name):
 @frappe.whitelist(allow_guest=False)
 def process_mpesa_express_request(doc):
 	try:
-		if getattr(doc, "custom_songa_wallet_processed", 0):
-			return
-
-		process_status = getattr(doc, "custom_songa_wallet_process_status", None) or "Pending"
-		if process_status == "Abandoned":
-			return
-
-		attempt_count = getattr(doc, "custom_songa_wallet_attempt_count", 0) or 0
-		if attempt_count >= MAX_MPESA_WALLET_ATTEMPTS:
-			return
-
 		if doc.status not in ("Completed", "Failed"):
 			return
 
-		if doc.reference_doctype not in ("Rental Days", "Energy KWh"):
+		wallet = frappe.db.get_value(
+			"Rental Days",
+			{"mpesa_express_request": doc.name},
+			["name", "driver", "amount", "transaction_type", "no_of_days", "status"],
+			as_dict=True,
+		)
+		wallet_doctype = "Rental Days"
+
+		if not wallet:
+			wallet = frappe.db.get_value(
+				"Energy KWh",
+				{"mpesa_express_request": doc.name},
+				["name", "driver", "amount", "transaction_type", "energy_qty", "status"],
+				as_dict=True,
+			)
+			wallet_doctype = "Energy KWh"
+
+		if not wallet:
 			return
 
-		reference_doctype = doc.reference_doctype
-		reference_doc = frappe.get_doc(reference_doctype, doc.reference_name)
-
-		if reference_doc.status != doc.status:
+		if wallet.status != doc.status:
 			try:
 				frappe.db.savepoint("mpesa_express_request")
-				frappe.db.set_value(reference_doctype, doc.reference_name, "status", doc.status)
+				frappe.db.set_value(wallet_doctype, wallet.name, "status", doc.status)
 				frappe.db.commit()
 			except Exception:
 				frappe.db.rollback(save_point="mpesa_express_request")
 				raise
 
 		if doc.status == "Completed":
-			post_mpesa_wallet_journal_entry(doc, reference_doc)
-
-			if not _mpesa_songa_webhook_already_sent(doc.name, reference_doctype):
+			if not _mpesa_songa_webhook_already_sent(doc.name, wallet_doctype):
 				payload = {
-					"driver_id": reference_doc.driver,
-					"transaction_type": reference_doc.transaction_type,
-					"amount": reference_doc.amount,
+					"driver_id": wallet.driver,
+					"transaction_type": wallet.transaction_type,
+					"amount": wallet.amount,
 					"mpesa_express_request": doc.name,
-					"action_type": _mpesa_wallet_action_type(reference_doctype),
+					"action_type": _mpesa_wallet_action_type(wallet_doctype),
 				}
 
-				if reference_doctype == "Rental Days":
-					rental_balance = get_rental_days_balance_by_driver(driver_id=reference_doc.driver)
+				if wallet_doctype == "Rental Days":
+					rental_balance = get_rental_days_balance_by_driver(driver_id=wallet.driver)
 					if rental_balance.get("status") == "success":
 						payload["rental_days_balance"] = rental_balance.get("total_rental_days", 0)
-					payload["rental_day_id"] = reference_doc.name
-					payload["no_of_days"] = reference_doc.no_of_days
-				elif reference_doctype == "Energy KWh":
-					energy_balance = get_energy_kwh_balance_by_driver(driver_id=reference_doc.driver)
+					payload["rental_day_id"] = wallet.name
+					payload["no_of_days"] = wallet.no_of_days
+				elif wallet_doctype == "Energy KWh":
+					energy_balance = get_energy_kwh_balance_by_driver(driver_id=wallet.driver)
 					if energy_balance.get("status") == "success":
 						payload["energy_kwh_balance"] = energy_balance.get("total_kwh", 0)
-					payload["energy_kwh_id"] = reference_doc.name
-					payload["kwh"] = reference_doc.energy_qty
+					payload["energy_kwh_id"] = wallet.name
+					payload["kwh"] = wallet.energy_qty
 
 				send_songa_webhook(payload, context="Mpesa Express Request")
 		else:
 			frappe.logger().info(
-				f"{reference_doctype} recharge cancelled for driver {reference_doc.driver} "
+				f"{wallet_doctype} recharge cancelled for driver {wallet.driver} "
 				f"due to failed M-Pesa payment."
 			)
 
-		_mark_mpesa_wallet_processed(doc.name)
 		frappe.db.commit()
 
 	except Exception as e:
@@ -887,17 +1110,17 @@ def process_mpesa_express_request(doc):
 		frappe.throw(str(e))
 
 
-def _clear_c2b_wallet_backref(c2b_name):
-	frappe.db.set_value(
-		"Mpesa C2B Payment Register",
-		c2b_name,
-		{
-			"custom_songa_reference_doctype": None,
-			"custom_songa_reference_name": None,
-			"submit_payment": 0,
-		},
-		update_modified=False,
-	)
+def _c2b_linked_wallet(c2b_name):
+	"""Return (wallet_doctype, wallet_name) if a wallet links this C2B register."""
+	for wallet_doctype in ("Rental Days", "Energy KWh"):
+		wallet_name = frappe.db.get_value(
+			wallet_doctype,
+			{"mpesa_c2b_payment_register": c2b_name},
+			"name",
+		)
+		if wallet_name:
+			return wallet_doctype, wallet_name
+	return None, None
 
 
 def _cancel_linked_c2b_payment_entry(c2b_doc):
@@ -916,7 +1139,7 @@ def _cancel_linked_c2b_payment_entry(c2b_doc):
 
 def find_eligible_c2b_by_transid(transid, amount):
 	"""
-	Find an unprocessed, unlinked C2B payment by exact transid.
+	Find an unlinked C2B payment by exact transid.
 
 	Locks matching rows FOR UPDATE. Returns a result dict:
 	- success: {"status": "success", "c2b_name": ...}
@@ -932,14 +1155,20 @@ def find_eligible_c2b_by_transid(transid, amount):
 	rows = frappe.db.sql(
 		"""
 		SELECT
-			name,
-			transamount,
-			IFNULL(custom_songa_wallet_processed, 0) AS custom_songa_wallet_processed,
-			IFNULL(custom_songa_reference_name, '') AS custom_songa_reference_name
-		FROM `tabMpesa C2B Payment Register`
-		WHERE transid = %s
-		  AND docstatus < 2
-		ORDER BY creation DESC
+			c2b.name,
+			c2b.transamount
+		FROM `tabMpesa C2B Payment Register` c2b
+		WHERE c2b.transid = %s
+		  AND c2b.docstatus < 2
+		  AND NOT EXISTS (
+			SELECT 1 FROM `tabRental Days` rd
+			WHERE rd.mpesa_c2b_payment_register = c2b.name
+		  )
+		  AND NOT EXISTS (
+			SELECT 1 FROM `tabEnergy KWh` ek
+			WHERE ek.mpesa_c2b_payment_register = c2b.name
+		  )
+		ORDER BY c2b.creation DESC
 		FOR UPDATE
 		""",
 		(transid,),
@@ -947,10 +1176,28 @@ def find_eligible_c2b_by_transid(transid, amount):
 	)
 
 	if not rows:
+		# Distinguish not found vs already linked
+		any_rows = frappe.db.sql(
+			"""
+			SELECT name, transamount
+			FROM `tabMpesa C2B Payment Register`
+			WHERE transid = %s AND docstatus < 2
+			ORDER BY creation DESC
+			LIMIT 1
+			""",
+			(transid,),
+			as_dict=True,
+		)
+		if not any_rows:
+			return {
+				"status": "error",
+				"http_status_code": 404,
+				"message": f"No M-Pesa C2B payment found for transaction_id {transid}",
+			}
 		return {
 			"status": "error",
-			"http_status_code": 404,
-			"message": f"No M-Pesa C2B payment found for transaction_id {transid}",
+			"http_status_code": 400,
+			"message": (f"M-Pesa C2B payment for transaction_id {transid} is already linked to a wallet."),
 		}
 
 	expected_amount = frappe.utils.flt(amount)
@@ -966,20 +1213,7 @@ def find_eligible_c2b_by_transid(transid, amount):
 			),
 		}
 
-	for row in amount_matches:
-		if row.custom_songa_wallet_processed:
-			continue
-		if row.custom_songa_reference_name:
-			continue
-		return {"status": "success", "c2b_name": row.name}
-
-	return {
-		"status": "error",
-		"http_status_code": 400,
-		"message": (
-			f"M-Pesa C2B payment for transaction_id {transid} is already linked or wallet-processed."
-		),
-	}
+	return {"status": "success", "c2b_name": amount_matches[0].name}
 
 
 @frappe.whitelist(allow_guest=False)
@@ -993,32 +1227,47 @@ def search_mpesa_c2b_for_wallet_link(full_name=None, transid=None, amount=None, 
 	except (TypeError, ValueError):
 		limit = 20
 
-	filters = [
-		["docstatus", "<", 2],
-		["custom_songa_wallet_processed", "=", 0],
-	]
-	or_filters = [
-		["custom_songa_reference_name", "is", "not set"],
-		["custom_songa_reference_name", "=", ""],
-	]
-
+	conditions = ["c2b.docstatus < 2"]
+	values = []
 	if full_name:
-		filters.append(["full_name", "like", f"%{full_name}%"])
+		conditions.append("c2b.full_name LIKE %s")
+		values.append(f"%{full_name}%")
 	if transid:
-		filters.append(["transid", "=", transid])
+		conditions.append("c2b.transid = %s")
+		values.append(transid)
 	if amount not in (None, ""):
 		try:
-			filters.append(["transamount", "=", float(amount)])
+			conditions.append("c2b.transamount = %s")
+			values.append(float(amount))
 		except (TypeError, ValueError):
 			frappe.throw("Amount must be a valid number.")
 
-	rows = frappe.get_all(
-		"Mpesa C2B Payment Register",
-		filters=filters,
-		or_filters=or_filters,
-		fields=["name", "transid", "full_name", "transamount", "transtime", "msisdn", "docstatus"],
-		order_by="creation desc",
-		limit_page_length=limit,
+	values.append(limit)
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			c2b.name,
+			c2b.transid,
+			c2b.full_name,
+			c2b.transamount,
+			c2b.transtime,
+			c2b.msisdn,
+			c2b.docstatus
+		FROM `tabMpesa C2B Payment Register` c2b
+		WHERE {" AND ".join(conditions)}
+		  AND NOT EXISTS (
+			SELECT 1 FROM `tabRental Days` rd
+			WHERE rd.mpesa_c2b_payment_register = c2b.name
+		  )
+		  AND NOT EXISTS (
+			SELECT 1 FROM `tabEnergy KWh` ek
+			WHERE ek.mpesa_c2b_payment_register = c2b.name
+		  )
+		ORDER BY c2b.creation DESC
+		LIMIT %s
+		""",
+		tuple(values),
+		as_dict=True,
 	)
 	return {"status": "success", "data": rows}
 
@@ -1043,15 +1292,10 @@ def _link_mpesa_c2b_to_wallet(wallet_doctype, wallet_name, c2b_name, *, commit=T
 	c2b = frappe.get_doc("Mpesa C2B Payment Register", c2b_name)
 	if c2b.docstatus == 2:
 		frappe.throw("Cancelled C2B payments cannot be linked.")
-	if getattr(c2b, "custom_songa_wallet_processed", 0):
-		frappe.throw("This C2B payment is already marked as wallet-processed.")
 
-	existing_ref = getattr(c2b, "custom_songa_reference_name", None)
-	if existing_ref and existing_ref != wallet_name:
-		frappe.throw(
-			f"C2B payment {c2b_name} is already linked to "
-			f"{c2b.custom_songa_reference_doctype} {existing_ref}."
-		)
+	linked_doctype, linked_name = _c2b_linked_wallet(c2b_name)
+	if linked_name and linked_name != wallet_name:
+		frappe.throw(f"C2B payment {c2b_name} is already linked to {linked_doctype} {linked_name}.")
 
 	wallet_amount = frappe.utils.flt(wallet.amount)
 	c2b_amount = frappe.utils.flt(c2b.transamount)
@@ -1067,16 +1311,22 @@ def _link_mpesa_c2b_to_wallet(wallet_doctype, wallet_name, c2b_name, *, commit=T
 		c2b_name,
 		update_modified=True,
 	)
-	frappe.db.set_value(
-		"Mpesa C2B Payment Register",
-		c2b_name,
-		{
-			"custom_songa_reference_doctype": wallet_doctype,
-			"custom_songa_reference_name": wallet_name,
-			"submit_payment": 0,
-		},
-		update_modified=False,
-	)
+
+	c2b_update = {}
+	sales_invoice_name = _find_sales_invoice_for_wallet(wallet_doctype, wallet_name)
+	if sales_invoice_name:
+		c2b_update["billrefnumber"] = sales_invoice_name
+		si_customer = frappe.db.get_value("Sales Invoice", sales_invoice_name, "customer")
+		if si_customer and not c2b.customer:
+			c2b_update["customer"] = si_customer
+
+	if c2b_update:
+		frappe.db.set_value(
+			"Mpesa C2B Payment Register",
+			c2b_name,
+			c2b_update,
+			update_modified=False,
+		)
 	if commit:
 		frappe.db.commit()
 
@@ -1084,6 +1334,7 @@ def _link_mpesa_c2b_to_wallet(wallet_doctype, wallet_name, c2b_name, *, commit=T
 		"status": "success",
 		"message": f"Linked C2B payment {c2b_name} to {wallet_doctype} {wallet_name}.",
 		"c2b_name": c2b_name,
+		"sales_invoice": sales_invoice_name,
 	}
 
 
@@ -1094,7 +1345,7 @@ def link_mpesa_c2b_to_wallet(wallet_doctype, wallet_name, c2b_name):
 
 
 def link_and_complete_mpesa_c2b_recharge(wallet_doctype, wallet_name, c2b_name):
-	"""Link a C2B payment and run the Songa wallet complete path (JE + webhook)."""
+	"""Link a C2B payment and complete the wallet via SI Payment Entry + webhook."""
 	_link_mpesa_c2b_to_wallet(wallet_doctype, wallet_name, c2b_name, commit=False)
 	return process_mpesa_c2b_wallet_payment(wallet_doctype, wallet_name)
 
@@ -1112,11 +1363,7 @@ def unlink_mpesa_c2b_from_wallet(wallet_doctype, wallet_name):
 	if wallet.status != "In Progress":
 		frappe.throw("C2B can only be unlinked while the wallet recharge is In Progress.")
 
-	if frappe.db.get_value("Mpesa C2B Payment Register", c2b_name, "custom_songa_wallet_processed"):
-		frappe.throw("Cannot unlink a C2B payment that has already been wallet-processed.")
-
 	frappe.db.set_value(wallet_doctype, wallet_name, "mpesa_c2b_payment_register", None)
-	_clear_c2b_wallet_backref(c2b_name)
 	frappe.db.commit()
 
 	return {
@@ -1127,7 +1374,7 @@ def unlink_mpesa_c2b_from_wallet(wallet_doctype, wallet_name):
 
 @frappe.whitelist(allow_guest=False)
 def process_mpesa_c2b_wallet_payment(wallet_doctype, wallet_name):
-	"""Complete a C2B-linked wallet recharge: status Completed, JE, webhook."""
+	"""Complete a C2B-linked wallet recharge: PE against SI, status Completed, webhook."""
 	if wallet_doctype not in ("Rental Days", "Energy KWh"):
 		frappe.throw("C2B wallet completion is only supported for Rental Days and Energy KWh.")
 
@@ -1142,21 +1389,14 @@ def process_mpesa_c2b_wallet_payment(wallet_doctype, wallet_name):
 
 	c2b = frappe.get_doc("Mpesa C2B Payment Register", c2b_name)
 
-	if getattr(c2b, "custom_songa_wallet_processed", 0):
-		if wallet.status != "Completed":
-			frappe.db.set_value(wallet_doctype, wallet_name, "status", "Completed")
+	if wallet.status == "Completed":
 		return {
 			"status": "success",
 			"message": "C2B wallet processing already completed.",
 			"wallet_name": wallet_name,
 			"c2b_name": c2b_name,
+			"sales_invoice": _find_sales_invoice_for_wallet(wallet_doctype, wallet_name),
 		}
-
-	if (
-		c2b.get("custom_songa_reference_doctype") != wallet_doctype
-		or c2b.get("custom_songa_reference_name") != wallet_name
-	):
-		frappe.throw("C2B payment is not linked to this wallet document.")
 
 	wallet_amount = frappe.utils.flt(wallet.amount)
 	c2b_amount = frappe.utils.flt(c2b.transamount)
@@ -1167,13 +1407,12 @@ def process_mpesa_c2b_wallet_payment(wallet_doctype, wallet_name):
 
 	try:
 		frappe.db.savepoint("mpesa_c2b_wallet_payment")
-		_cancel_linked_c2b_payment_entry(c2b)
 
-		post_mpesa_wallet_journal_entry(c2b, wallet)
+		sales_invoice = create_wallet_c2b_sales_invoice(wallet_doctype, wallet_name)
+		payment_entry_name = reconcile_c2b_to_sales_invoice(c2b_name, sales_invoice.name)
 
-		if wallet.status != "Completed":
-			frappe.db.set_value(wallet_doctype, wallet_name, "status", "Completed")
-			wallet.reload()
+		frappe.db.set_value(wallet_doctype, wallet_name, "status", "Completed")
+		wallet.reload()
 
 		if not _mpesa_songa_webhook_already_sent(
 			c2b.name, wallet_doctype, source_doctype="Mpesa C2B Payment Register"
@@ -1183,6 +1422,8 @@ def process_mpesa_c2b_wallet_payment(wallet_doctype, wallet_name):
 				"transaction_type": wallet.transaction_type,
 				"amount": wallet.amount,
 				"mpesa_c2b_payment_register": c2b.name,
+				"sales_invoice": sales_invoice.name,
+				"payment_entry": payment_entry_name,
 				"action_type": _mpesa_wallet_action_type(wallet_doctype),
 			}
 			if wallet_doctype == "Rental Days":
@@ -1199,7 +1440,6 @@ def process_mpesa_c2b_wallet_payment(wallet_doctype, wallet_name):
 				payload["kwh"] = wallet.energy_qty
 			send_songa_webhook(payload, context="Mpesa C2B Payment Register")
 
-		_mark_mpesa_wallet_processed(c2b.name, source_doctype="Mpesa C2B Payment Register")
 		frappe.db.commit()
 	except Exception as e:
 		frappe.db.rollback(save_point="mpesa_c2b_wallet_payment")
@@ -1211,6 +1451,8 @@ def process_mpesa_c2b_wallet_payment(wallet_doctype, wallet_name):
 		"message": "C2B wallet recharge completed.",
 		"wallet_name": wallet_name,
 		"c2b_name": c2b_name,
+		"sales_invoice": sales_invoice.name,
+		"payment_entry": payment_entry_name,
 	}
 
 
