@@ -27,28 +27,14 @@ def auto_process_mpesa_express_wallet(name: str) -> None:
 	except frappe.DoesNotExistError:
 		return
 
-	if doc.reference_doctype not in ("Rental Days", "Energy KWh"):
-		return
-
 	if doc.status not in ("Completed", "Failed"):
 		return
 
-	if getattr(doc, "custom_songa_wallet_processed", 0):
-		return
-
-	process_status = getattr(doc, "custom_songa_wallet_process_status", None) or "Pending"
-	if process_status == "Abandoned":
-		return
-
-	from songa_mobility_phase_2.songa_app_integration.utils.utils import (
-		process_mpesa_express_request,
-		record_mpesa_wallet_processing_failure,
-	)
+	from songa_mobility_phase_2.songa_app_integration.utils.utils import process_mpesa_express_request
 
 	try:
 		process_mpesa_express_request(doc)
 	except Exception:
-		record_mpesa_wallet_processing_failure(name)
 		frappe.log_error(
 			frappe.get_traceback(),
 			f"Auto-process Mpesa Express Request {name} failed",
@@ -87,7 +73,9 @@ def _handle_payment_request_successful_transaction(request_doc, settings):
 		invoice = frappe.get_doc("Sales Invoice", payment_request.reference_name)
 		if invoice.docstatus == 0:
 			try:
-				invoice.submit()
+				from songa_mobility_phase_2.songa_app_integration.utils.utils import submit_sales_invoice
+
+				submit_sales_invoice(invoice)
 			except Exception:
 				log_and_throw_error("Payment Request Submission Error", request_doc.name)
 
@@ -109,6 +97,8 @@ def _handle_payment_request_successful_transaction(request_doc, settings):
 
 	frappe.db.set_value("Payment Request", payment_request.name, "status", "Paid")
 	set_mpesa_request_reconciled(request_doc)
+	request_doc.reload()
+	auto_process_mpesa_express_wallet(request_doc.name)
 
 
 def _wrapped_handle_successful_transaction(original):

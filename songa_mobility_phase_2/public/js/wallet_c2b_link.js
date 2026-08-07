@@ -197,7 +197,9 @@ frappe.songa_wallet_c2b.setup_form = (frm) => {
 
 		frm.add_custom_button(__("Complete Wallet Recharge"), () => {
 			frappe.confirm(
-				__("Complete this wallet recharge using the linked C2B payment?"),
+				__(
+					"Complete this wallet recharge? This allocates the C2B Payment Entry to the Sales Invoice and marks the wallet Completed."
+				),
 				() => {
 					frappe.songa_wallet_c2b.call(
 						"process_mpesa_c2b_wallet_payment",
