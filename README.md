@@ -18,7 +18,7 @@ Driver wallets · M-Pesa recharges · Commission approvals · Asset maintenance
 | | |
 |:---:|:---:|
 | **Module** | `Songa App Integration` |
-| **Publisher** | Teamweb Limited |
+| **Publisher** | Lucky Tsuma |
 | **License** | MIT |
 
 </div>
@@ -322,7 +322,8 @@ flowchart TD
 
 ## API reference
 
-> All endpoints require authentication (`allow_guest=False`) — Frappe session cookie or API key.
+> All endpoints require authentication (`allow_guest=False`) — Frappe session cookie or API key.  
+> A Postman collection with the same requests lives in [`postman/Songa App Integration.json`](postman/Songa%20App%20Integration.json).
 
 **Base path**
 
@@ -331,8 +332,17 @@ POST /api/method/songa_mobility_phase_2.songa_app_integration.api.api.<method>
 Content-Type: application/json
 ```
 
-**Response shape:** `{ "status": "success" | "error", "message": "...", ... }`  
-HTTP codes on errors: `400` · `403` · `404` · `500`
+Balance helpers use:
+
+```
+GET|POST /api/method/songa_mobility_phase_2.songa_app_integration.utils.utils.<method>
+```
+
+**Response notes**
+
+- Method return values below are the JSON object returned by the whitelisted function (Frappe typically nests them under `"message"`).
+- Shared errors on most `api.api` endpoints: empty body → `400` `"No data provided"`; missing required fields → `500` `"Missing required fields: …"`; unexpected failures → `500` with the exception message.
+- Recharge endpoints may also return `500` when Songa Customization Settings are incomplete *(item / MoP / gateway fields)*.
 
 ---
 
@@ -351,6 +361,40 @@ Create a commission allocation ledger entry *(awaiting approval)*.
 | `amount` | ✅ | Positive number |
 | `company` | — | Defaults to user default company |
 
+**Request**
+
+```json
+{
+  "driver_id": "TEST001",
+  "company": "",
+  "amount": 500
+}
+```
+
+**Success `200`**
+
+```json
+{
+  "status": "success",
+  "message": "Commission allocation ledger created, please await approval.",
+  "data": {
+    "name": "COM-LEG-2026-00001",
+    "driver": "TEST001",
+    "amount": 500.0,
+    "transaction_type": "Allocation",
+    "company": "Songa"
+  }
+}
+```
+
+**Errors**
+
+| HTTP | Example `message` |
+|-----:|-------------------|
+| `404` | `Driver not found` |
+| `400` | `A valid positive amount is required` |
+| `400` / `500` | Shared empty / missing-field / unexpected errors |
+
 <br>
 
 #### `recharge_rental_days`
@@ -367,34 +411,409 @@ Create a commission allocation ledger entry *(awaiting approval)*.
 
 - **Commission** — validates balance, submits wallet, creates Deduction ledger *(Pending)*, links wallet as **In Progress**; completes on approver **Approve**
 - **M-Pesa Express (`mpesa`)** — creates Sales Invoice + Payment Request + STK Express request; returns `"status": "pending"` with `mpesa_request`; wallet credits after STK confirms and Payment Entry is posted
-- **M-Pesa C2B** (no `transaction_id`) — creates wallet + Sales Invoice; returns `"status": "pending"` with `rental_day_id` / `energy_kwh_id` and `sales_invoice` *(use as PayBill BillRef)*; wallet completes automatically when the matching C2B Payment Register is submitted against that SI
+- **M-Pesa C2B** (no `transaction_id`) — creates wallet + Sales Invoice; returns `"status": "pending"` with `rental_day_id` and `sales_invoice` *(use as PayBill BillRef)*; wallet completes automatically when the matching C2B Payment Register is submitted against that SI
 - **M-Pesa C2B** (with `transaction_id`) — creates wallet + Sales Invoice, matches C2B by `transid` + amount, allocates Payment Entry to the SI, completes wallet + webhook; returns `"status": "success"` with balances
+
+**Request — M-Pesa Express**
+
+```json
+{
+  "driver_id": "TEST001",
+  "company": "",
+  "amount": 1500,
+  "no_of_days": 3,
+  "payment_method": "mpesa",
+  "phone_number": "07########"
+}
+```
+
+**Success `200` (pending)**
+
+```json
+{
+  "status": "pending",
+  "message": "M-Pesa payment initiated. Rental days will be recharged once payment is confirmed.",
+  "mpesa_request": "MER-00045"
+}
+```
+
+**Request — M-Pesa C2B without `transaction_id`**
+
+```json
+{
+  "driver_id": "TEST001",
+  "company": "",
+  "amount": 1500,
+  "no_of_days": 3,
+  "payment_method": "mpesa_c2b"
+}
+```
+
+**Success `200` (pending)**
+
+```json
+{
+  "status": "pending",
+  "message": "Rental days recharge created. Use the sales_invoice name as the PayBill account reference; the wallet completes automatically when the C2B payment is submitted against that invoice.",
+  "rental_day_id": "TRIP-00721",
+  "sales_invoice": "ACC-SINV-2026-00088"
+}
+```
+
+**Request — M-Pesa C2B with existing transaction**
+
+```json
+{
+  "driver_id": "TEST001",
+  "company": "",
+  "amount": 1500,
+  "no_of_days": 3,
+  "payment_method": "mpesa_c2b",
+  "transaction_id": "TST20260807064825001"
+}
+```
+
+**Success `200`**
+
+```json
+{
+  "status": "success",
+  "message": "Rental days recharged successfully via M-Pesa C2B",
+  "rental_day_id": "TRIP-00721",
+  "sales_invoice": "ACC-SINV-2026-00088",
+  "mpesa_c2b_payment_register": "MPESA-C2B-00012",
+  "total_rental_days_balance": 12
+}
+```
+
+**Request — commission**
+
+```json
+{
+  "driver_id": "TEST001",
+  "amount": 1500,
+  "no_of_days": 3,
+  "payment_method": "commission"
+}
+```
+
+**Success `200` (pending)**
+
+```json
+{
+  "status": "pending",
+  "message": "Commission deduction created. Rental days will be recharged once the deduction is approved.",
+  "rental_day_id": "TRIP-00721",
+  "commission_ledger": "COM-LEG-2026-00042"
+}
+```
+
+**Errors**
+
+| HTTP | Example `message` |
+|-----:|-------------------|
+| `400` | `Invalid payment method. Must be 'commission', 'mpesa', or 'mpesa_c2b'` |
+| `400` | `transaction_id is only supported when payment_method is 'mpesa_c2b'` |
+| `400` | `A valid positive amount is required` |
+| `400` | `A valid positive number of days is required` |
+| `400` | `Invalid phone number` |
+| `400` | `Amount exceeds commission balance` |
+| `400` | `Amount mismatch: wallet amount is … but C2B transamount is … for transaction_id …` |
+| `400` | `M-Pesa C2B payment for transaction_id … is already linked to a wallet.` |
+| `404` | `Driver not found` |
+| `404` | `No M-Pesa C2B payment found for transaction_id …` |
+| `500` | Incomplete Songa Customization Settings / unexpected exception |
 
 <br>
 
 #### `recharge_kwh`
 
-Same as `recharge_rental_days`, but use `kwh` *(float)* instead of `no_of_days`.
-
-<br>
-
-#### `consume_rental_days` · `consume_kwh`
+Same payment-method behaviour as `recharge_rental_days`, but use `kwh` *(float)* instead of `no_of_days`. Response field names use `energy_kwh_id` / `kwh_balance` instead of `rental_day_id` / `total_rental_days_balance`.
 
 | Field | Required | Description |
 |-------|:--------:|-------------|
 | `driver_id` | ✅ | |
-| `no_of_days` / `kwh` | ✅ | Must not exceed balance |
+| `amount` | ✅ | Positive number |
+| `kwh` | ✅ | Positive number |
+| `payment_method` | ✅ | `"commission"`, `"mpesa"`, or `"mpesa_c2b"` |
+| `phone_number` | if mpesa | Kenyan mobile format |
+| `transaction_id` | if mpesa_c2b (optional) | M-Pesa C2B `transid` |
 | `company` | — | |
+
+**Request**
+
+```json
+{
+  "driver_id": "TEST001",
+  "company": "",
+  "kwh": 1,
+  "amount": 1,
+  "payment_method": "mpesa",
+  "phone_number": "07########"
+}
+```
+
+**Success `200` (pending — Express)**
+
+```json
+{
+  "status": "pending",
+  "message": "M-Pesa payment initiated. Energy KWh will be recharged once payment is confirmed.",
+  "mpesa_request": "MER-00046"
+}
+```
+
+**Success `200` (pending — C2B without `transaction_id`)**
+
+```json
+{
+  "status": "pending",
+  "message": "Energy KWh recharge created. Use the sales_invoice name as the PayBill account reference; the wallet completes automatically when the C2B payment is submitted against that invoice.",
+  "energy_kwh_id": "KWh-00720",
+  "sales_invoice": "ACC-SINV-2026-00089"
+}
+```
+
+**Success `200` (C2B with `transaction_id`)**
+
+```json
+{
+  "status": "success",
+  "message": "Energy kWh recharged successfully via M-Pesa C2B",
+  "energy_kwh_id": "KWh-00720",
+  "sales_invoice": "ACC-SINV-2026-00089",
+  "mpesa_c2b_payment_register": "MPESA-C2B-00013",
+  "kwh_balance": 42.5
+}
+```
+
+**Success `200` (pending — commission)**
+
+```json
+{
+  "status": "pending",
+  "message": "Commission deduction created. Energy KWh will be recharged once the deduction is approved.",
+  "energy_kwh_id": "KWh-00720",
+  "commission_ledger": "COM-LEG-2026-00043"
+}
+```
+
+**Errors** — same family as `recharge_rental_days`, plus `400` `A valid positive kWh value is required`.
 
 <br>
 
-#### `cancel_rental_days` · `cancel_energy_kwh`
+#### `consume_rental_days`
+
+| Field | Required | Description |
+|-------|:--------:|-------------|
+| `driver_id` | ✅ | |
+| `no_of_days` | ✅ | Must not exceed balance |
+| `company` | — | |
+
+**Request**
+
+```json
+{
+  "driver_id": "TEST001",
+  "no_of_days": 1,
+  "company": ""
+}
+```
+
+**Success `200`**
+
+```json
+{
+  "status": "success",
+  "message": "Rental days consumed successfully.",
+  "total_rental_days_balance": 8
+}
+```
+
+**Errors**
+
+| HTTP | Example `message` |
+|-----:|-------------------|
+| `404` | `Driver not found` |
+| `400` | `A valid positive number of days is required` |
+| `400` | `Not enough rental days balance` |
+| `400` / `500` | Shared empty / missing-field / unexpected errors |
+
+<br>
+
+#### `consume_kwh`
+
+| Field | Required | Description |
+|-------|:--------:|-------------|
+| `driver_id` | ✅ | |
+| `kwh` | ✅ | Must not exceed balance |
+| `company` | — | |
+
+**Request**
+
+```json
+{
+  "driver_id": "TEST001",
+  "kwh": 1,
+  "company": ""
+}
+```
+
+**Success `200`**
+
+```json
+{
+  "status": "success",
+  "message": "kWh consumed successfully.",
+  "kwh_balance": 10.5
+}
+```
+
+**Errors**
+
+| HTTP | Example `message` |
+|-----:|-------------------|
+| `404` | `Driver not found` |
+| `400` | `A valid positive kWh value is required` |
+| `400` | `Not enough kWh balance` |
+| `400` / `500` | Shared empty / missing-field / unexpected errors |
+
+<br>
+
+#### `cancel_rental_days`
 
 | Field | Required |
 |-------|:--------:|
-| `rental_day_id` / `energy_kwh_id` | ✅ |
+| `rental_day_id` | ✅ |
 
 Cancels the wallet document and reverses linked commission ledger, M-Pesa Express chain *(Express → Payment Request → Sales Invoice)*, or C2B billing *(Payment Entry → Sales Invoice)*.
+
+**Request**
+
+```json
+{
+  "rental_day_id": "TRIP-00721"
+}
+```
+
+**Success `200`**
+
+```json
+{
+  "status": "success",
+  "message": "Rental Days cancelled successfully. ID: TRIP-00721"
+}
+```
+
+**Success `200` (already cancelled)**
+
+```json
+{
+  "status": "success",
+  "message": "Rental Days is already cancelled. ID: TRIP-00721"
+}
+```
+
+**Errors**
+
+| HTTP | Example `message` |
+|-----:|-------------------|
+| `404` | `Rental Days not found` |
+| `400` | `Rental Days is not submitted` |
+| `403` | `You do not have permission to cancel this record` |
+| `400` / `500` | Shared empty / missing-field / unexpected errors |
+
+<br>
+
+#### `cancel_energy_kwh`
+
+| Field | Required |
+|-------|:--------:|
+| `energy_kwh_id` | ✅ |
+
+**Request**
+
+```json
+{
+  "energy_kwh_id": "KWh-00720"
+}
+```
+
+**Success `200`**
+
+```json
+{
+  "status": "success",
+  "message": "Energy KWh cancelled successfully. ID: KWh-00720"
+}
+```
+
+**Errors** — same pattern as `cancel_rental_days` with `Energy KWh` in messages.
+
+<br>
+
+#### Balance helpers
+
+These live under `utils.utils` (see base path above). Body or query may include `driver_id`. Validation failures use `frappe.throw` *(standard Frappe error response)* for missing `driver_id` / unknown driver / missing supplier or company.
+
+**Request** *(all four methods)*
+
+```json
+{
+  "driver_id": "TEST001"
+}
+```
+
+**`get_commission_balance_by_driver` — success**
+
+```json
+{
+  "status": "success",
+  "balance": 2650.0
+}
+```
+
+**`get_rental_days_balance_by_driver` — success**
+
+```json
+{
+  "status": "success",
+  "total_rental_days": 9
+}
+```
+
+**`get_energy_kwh_balance_by_driver` — success**
+
+```json
+{
+  "status": "success",
+  "total_kwh": 42.5
+}
+```
+
+**`get_overall_balance` — success**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "commission_balance": 2650.0,
+    "rental_days_balance": 9,
+    "energy_kwh_balance": 42.5
+  }
+}
+```
+
+**Errors** *(helpers)*
+
+```json
+{
+  "status": "error",
+  "message": "Error fetching commission balance: …"
+}
+```
+
+Other common throws: `driver_id is required`, `Driver not found`, `Driver does not have an associated supplier`, `company is required`.
 
 </details>
 
@@ -409,14 +828,60 @@ Cancels the wallet document and reverses linked commission ledger, M-Pesa Expres
 |-------|:--------:|-------------|
 | `asset_repair_id` | ✅ | External Songa ID → `custom_asset_repair_id` |
 | `asset_id` | ✅ | ERPNext Asset name |
-| `asset_type_id` | ✅ | Asset Type link |
-| `severity_type_id` | ✅ | Severity Type link |
-| `failure_date` | ✅ | ISO datetime |
+| `asset_type_id` | ✅ | Asset Type name/ID |
+| `severity_type_id` | ✅ | Severity Type name/ID *(e.g. Low / Medium / Serious / Critical)* |
+| `failure_date` | ✅ | Datetime (`yyyy-mm-dd HH:MM:SS` or date) |
 | `description` | ✅ | Error description |
-| `user_email` | ✅ | Frappe User *(creator context)* |
-| `company` | — | |
+| `user_email` | ✅ | Frappe User email *(issue owner / creator context)* |
+| `company` | — | Defaults to user default company |
 
 Enters workflow at **Pending Approval - Technical Agent**. Idempotent on duplicate `asset_repair_id`.
+
+**Request**
+
+```json
+{
+  "asset_repair_id": "repair-020",
+  "company": "",
+  "failure_date": "2026-07-20 08:59:00",
+  "description": "Battery does not charge.",
+  "user_email": "hub.manager@example.com",
+  "asset_id": "ACC-ASS-2024-00165",
+  "severity_type_id": 3,
+  "asset_type_id": 2
+}
+```
+
+**Success `200`**
+
+```json
+{
+  "status": "success",
+  "message": "Asset Repair created successfully.",
+  "asset_repair_id": "repair-020"
+}
+```
+
+**Success `200` (duplicate `asset_repair_id`)**
+
+```json
+{
+  "status": "success",
+  "message": "Duplicate Asset Repair",
+  "asset_repair_id": "repair-020"
+}
+```
+
+**Errors**
+
+| HTTP | Example `message` |
+|-----:|-------------------|
+| `404` | `User not found` |
+| `404` | `Asset Type not found` |
+| `404` | `Severity Type not found` |
+| `403` | `User is disabled` |
+| `400` | `user_email is required` / missing required fields |
+| `500` | Unexpected exception |
 
 <br>
 
@@ -426,7 +891,45 @@ Enters workflow at **Pending Approval - Technical Agent**. Idempotent on duplica
 |-------|:--------:|
 | `asset_repair_id` | ✅ |
 
-Returns repair details, workflow state, costs, and stock items if consumed.
+**Request**
+
+```json
+{
+  "asset_repair_id": "repair-007"
+}
+```
+
+**Success `200`**
+
+```json
+{
+  "status": "success",
+  "message": {
+    "asset_repair_id": "repair-007",
+    "asset": "ACC-ASS-2024-00165",
+    "asset_name": "Trike 165",
+    "asset_type": "Trike",
+    "severity_type": "Serious",
+    "failure_date": "2026-07-20 08:59:00",
+    "completion_date": null,
+    "repair_status": "Pending",
+    "workflow_state": "Pending Approval - Technical Agent",
+    "stock_consumption": 0,
+    "total_repair_cost": 0,
+    "description": "Battery does not charge.",
+    "actions_performed": null
+  }
+}
+```
+
+When `stock_consumption` is set, `message.stock_items` is an array of `{ item_code, warehouse, valuation_rate, uom, consumed_quantity, total_value }`.
+
+**Errors**
+
+| HTTP | Example `message` |
+|-----:|-------------------|
+| `404` | `Asset Repair not found. ID: repair-007` |
+| `400` / `500` | Shared empty / missing-field / unexpected errors |
 
 <br>
 
@@ -435,8 +938,51 @@ Returns repair details, workflow state, costs, and stock items if consumed.
 | Field | Required | Description |
 |-------|:--------:|-------------|
 | `asset_repair_id` | ✅ | |
-| `updated_values` | ✅ | `{ severity_type_id, asset_type_id, description, failure_date }` |
-| `user_email` | ✅ | |
+| `updated_values` | ✅ | Object with any of: `severity_type_id`, `asset_type_id`, `description`, `failure_date` — omit keys you are not changing |
+| `user_email` | ✅ | Must hold an edit role for the repair’s current workflow state |
+
+**Request**
+
+```json
+{
+  "asset_repair_id": "repair-007",
+  "user_email": "hub.manager@example.com",
+  "updated_values": {
+    "severity_type_id": 3,
+    "asset_type_id": 2,
+    "description": "Battery does not charge. Please replace.",
+    "failure_date": "2026-04-01"
+  }
+}
+```
+
+**Success `200`**
+
+```json
+{
+  "status": "success",
+  "message": "Asset Repair updated successfully.",
+  "asset_repair_id": "repair-007",
+  "updated_fields": [
+    "severity_type_id",
+    "asset_type_id",
+    "description",
+    "failure_date"
+  ]
+}
+```
+
+**Errors**
+
+| HTTP | Example `message` |
+|-----:|-------------------|
+| `404` | `Asset Repair not found. ID: …` |
+| `404` | `Severity Type not found` / `Asset Type not found` |
+| `400` | `updated_values must be a non-empty object` |
+| `400` | `Unrecognised fields in updated_values: …` |
+| `400` | `No roles configured for workflow state: …` |
+| `403` | `User is disabled` / missing required workflow role |
+| `400` / `500` | Shared empty / missing-field / unexpected errors |
 
 </details>
 
@@ -578,7 +1124,7 @@ Returns repair details, workflow state, costs, and stock items if consumed.
 }
 ```
 
-#### 6) Lease / commission accounting hook (Payment Entry example)
+#### 6) Commission Encashment (Triggered via Payment Entry)
 
 ```json
 {
@@ -591,7 +1137,7 @@ Returns repair details, workflow state, costs, and stock items if consumed.
 }
 ```
 
-#### 7) Lease payment Journal Entry hook
+#### 7) Lease payment (Triggered via Journal Entry)
 
 ```json
 {
