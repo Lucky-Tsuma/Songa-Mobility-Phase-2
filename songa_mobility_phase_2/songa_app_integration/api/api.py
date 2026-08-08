@@ -77,7 +77,7 @@ def _rollback_savepoint(save_point):
 		frappe.db.rollback()
 
 
-def _validate_songa_actor(user_email, required_roles):
+def _validate_songa_actor(user_email, required_roles=None):
 	"""Ensure the platform user exists, is enabled, and holds a required role."""
 	if not user_email:
 		frappe.local.response["http_status_code"] = 400
@@ -90,6 +90,9 @@ def _validate_songa_actor(user_email, required_roles):
 	if not frappe.db.get_value("User", user_email, "enabled"):
 		frappe.local.response["http_status_code"] = 403
 		raise frappe.PermissionError("User is disabled")
+
+	if not required_roles:
+		return
 
 	user_roles = set(frappe.get_roles(user_email))
 	if not user_roles.intersection(set(required_roles)):
@@ -978,7 +981,7 @@ def create_asset_repair():
 		failure_date = data.get("failure_date")
 		company = data.get("company")
 
-		_validate_songa_actor(user_email, ["Technical Agent"])
+		_validate_songa_actor(user_email)
 
 		if frappe.db.exists("Asset Repair", {"custom_asset_repair_id": asset_repair_id}):
 			frappe.local.response["http_status_code"] = 200
