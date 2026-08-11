@@ -1,0 +1,647 @@
+{
+  "info": {
+    "name": "Songa App Integration",
+    "description": null,
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Maintenance",
+      "item": [
+        {
+          "name": "check_asset_repair_status",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{songa_integration_auth_token}}",
+                "description": "",
+                "disabled": false,
+                "type": "default"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "",
+            "url": {
+              "raw": "{{songa_integration_base_url}}api/method/songa_mobility_phase_2.songa_app_integration.api.api.check_asset_repair_status",
+              "protocol": "",
+              "host": [
+                "{{songa_integration_base_url}}api"
+              ],
+              "path": [
+                "method",
+                "songa_mobility_phase_2.songa_app_integration.api.api.check_asset_repair_status"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"asset_repair_id\": \"repair-007\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "create_asset_repair",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{songa_integration_auth_token}}",
+                "description": "",
+                "disabled": false,
+                "type": "default"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "",
+            "url": {
+              "raw": "{{songa_integration_base_url}}api/method/songa_mobility_phase_2.songa_app_integration.api.api.create_asset_repair",
+              "protocol": "",
+              "host": [
+                "{{songa_integration_base_url}}api"
+              ],
+              "path": [
+                "method",
+                "songa_mobility_phase_2.songa_app_integration.api.api.create_asset_repair"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"asset_repair_id\": \"repair-020\", /* mandatory */\n  \"company\": \"\", /* optional, use default company will be used if blank */\n  \"failure_date\": \"2026-07-20 08:59:00\", /* mandatory yyyy-dd-mm*/\n  \"description\": \"Battery does not charge.\", /* mandatory field */\n  \"user_email\": \"tsuma@teamweb.africa\", /* mandatory. hub manager email, used to identify issue ownwer on the system */\n  \"asset_id\": \"ACC-ASS-2024-00165\", /* optional field in case issue is linked to an asset on the system */\n  \"severity_type_id\": 3,   /* LOW, MEDIUM, SERIOUS, CRITICAL*/\n  \"asset_type_id\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "update_asset_repair",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{songa_integration_auth_token}}",
+                "description": "",
+                "disabled": false,
+                "type": "default"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "",
+            "url": {
+              "raw": "{{songa_integration_base_url}}api/method/songa_mobility_phase_2.songa_app_integration.api.api.update_asset_repair",
+              "protocol": "",
+              "host": [
+                "{{songa_integration_base_url}}api"
+              ],
+              "path": [
+                "method",
+                "songa_mobility_phase_2.songa_app_integration.api.api.update_asset_repair"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"asset_repair_id\": \"repair-007\", /* mandatory */\n  \"user_email\": \"tsuma@teamweb.africa\", /* mandatory */\n  \"updated_values\": {\n    \"severity_type_id\": 3,\n    \"asset_type_id\": 2,\n    \"description\": \"Battery does not charge. We suspect its broken, please replace. The sooner, the better. Please\",\n    \"failure_date\": \"2026-04-01\"\n  }\n/* key value pair in updated_values depend on what you want to update, these are the allowed keys for now. Don't include a key if you don't need */\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Driver wallet",
+      "item": [
+        {
+          "name": "recharge_KWh",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{songa_integration_auth_token}}",
+                "description": "",
+                "disabled": false,
+                "type": "default"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "",
+            "url": {
+              "raw": "{{songa_integration_base_url}}api/method/songa_mobility_phase_2.songa_app_integration.api.api.recharge_kwh",
+              "protocol": "",
+              "host": [
+                "{{songa_integration_base_url}}api"
+              ],
+              "path": [
+                "method",
+                "songa_mobility_phase_2.songa_app_integration.api.api.recharge_kwh"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driver_id\": \"TEST001\",\n  \"company\": \"\", /*optional. Default company is picked if no value is provided*/\n  \"kwh\": 1,\n  \"amount\": 1,\n  \"payment_method\": \"mpesa\", /*commission, mpesa, mpesa_c2b*/\n  \"transaction_id\": \"\", /*optional, applies to mpesa_c2b*/\n  \"phone_number\": \"07########\" /*mandatory only if payment_method is mpesa*/\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "recharge_rental_days",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{songa_integration_auth_token}}",
+                "description": "",
+                "disabled": false,
+                "type": "default"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "",
+            "url": {
+              "raw": "{{songa_integration_base_url}}api/method/songa_mobility_phase_2.songa_app_integration.api.api.recharge_rental_days",
+              "protocol": "",
+              "host": [
+                "{{songa_integration_base_url}}api"
+              ],
+              "path": [
+                "method",
+                "songa_mobility_phase_2.songa_app_integration.api.api.recharge_rental_days"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driver_id\": \"TEST001\",\n  \"company\": \"\", /*optional. Default company is picked if no value is provided*/\n  \"amount\": 1,\n  \"no_of_days\": 1,\n  \"payment_method\": \"mpesa_c2b\", /*commission, mpesa, mpesa_c2b*/\n  \"transaction_id\": \"TST20260807064825001\", /*optional, applies to mpesa_c2b*/\n  \"phone_number\": \"07########\" /*mandatory only if payment_method is mpesa*/\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "allocate_commission",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{songa_integration_auth_token}}",
+                "description": "",
+                "disabled": false,
+                "type": "default"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "",
+            "url": {
+              "raw": "{{songa_integration_base_url}}api/method/songa_mobility_phase_2.songa_app_integration.api.api.allocate_commission",
+              "protocol": "",
+              "host": [
+                "{{songa_integration_base_url}}api"
+              ],
+              "path": [
+                "method",
+                "songa_mobility_phase_2.songa_app_integration.api.api.allocate_commission"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driver_id\": \"TEST001\",\n  \"company\": \"\", /*optional. Default company is picked if no value is provided*/\n  \"amount\": 500\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "cancel_KWh",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{songa_integration_auth_token}}",
+                "description": "",
+                "disabled": false,
+                "type": "default"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "",
+            "url": {
+              "raw": "{{songa_integration_base_url}}api/method/songa_mobility_phase_2.songa_app_integration.api.api.cancel_energy_kwh",
+              "protocol": "",
+              "host": [
+                "{{songa_integration_base_url}}api"
+              ],
+              "path": [
+                "method",
+                "songa_mobility_phase_2.songa_app_integration.api.api.cancel_energy_kwh"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"energy_kwh_id\": \"KWh-00720\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "cancel_rental_day",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{songa_integration_auth_token}}",
+                "description": "",
+                "disabled": false,
+                "type": "default"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "",
+            "url": {
+              "raw": "{{songa_integration_base_url}}api/method/songa_mobility_phase_2.songa_app_integration.api.api.cancel_rental_days",
+              "protocol": "",
+              "host": [
+                "{{songa_integration_base_url}}api"
+              ],
+              "path": [
+                "method",
+                "songa_mobility_phase_2.songa_app_integration.api.api.cancel_rental_days"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rental_day_id\": \"TRIP-00721\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "consume_rental_days",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{songa_integration_auth_token}}",
+                "description": "",
+                "disabled": false,
+                "type": "default"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "",
+            "url": {
+              "raw": "{{songa_integration_base_url}}api/method/songa_mobility_phase_2.songa_app_integration.api.api.consume_rental_days",
+              "protocol": "",
+              "host": [
+                "{{songa_integration_base_url}}api"
+              ],
+              "path": [
+                "method",
+                "songa_mobility_phase_2.songa_app_integration.api.api.consume_rental_days"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driver_id\": \"TEST001\",\n  \"no_of_days\": 1,\n  \"company\": \"\" /*optional. Default company is picked if no value is provided*/\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "consume_KWh",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{songa_integration_auth_token}}",
+                "description": "",
+                "disabled": false,
+                "type": "default"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "",
+            "url": {
+              "raw": "{{songa_integration_base_url}}api/method/songa_mobility_phase_2.songa_app_integration.api.api.consume_kwh",
+              "protocol": "",
+              "host": [
+                "{{songa_integration_base_url}}api"
+              ],
+              "path": [
+                "method",
+                "songa_mobility_phase_2.songa_app_integration.api.api.consume_kwh"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driver_id\": \"TEST001\",\n  \"kwh\": 1,\n  \"company\": \"\" /*optional. Default company is picked if no value is provided*/\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "get_commission_balance_by_driver",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{songa_integration_auth_token}}",
+                "description": "",
+                "disabled": false,
+                "type": "default"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "",
+            "url": {
+              "raw": "{{songa_integration_base_url}}api/method/songa_mobility_phase_2.songa_app_integration.utils.utils.get_commission_balance_by_driver",
+              "protocol": "",
+              "host": [
+                "{{songa_integration_base_url}}api"
+              ],
+              "path": [
+                "method",
+                "songa_mobility_phase_2.songa_app_integration.utils.utils.get_commission_balance_by_driver"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driver_id\": \"TEST001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "get_energy_balance_by_driver",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{songa_integration_auth_token}}",
+                "description": "",
+                "disabled": false,
+                "type": "default"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "",
+            "url": {
+              "raw": "{{songa_integration_base_url}}api/method/songa_mobility_phase_2.songa_app_integration.utils.utils.get_energy_kwh_balance_by_driver",
+              "protocol": "",
+              "host": [
+                "{{songa_integration_base_url}}api"
+              ],
+              "path": [
+                "method",
+                "songa_mobility_phase_2.songa_app_integration.utils.utils.get_energy_kwh_balance_by_driver"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driver_id\": \"TEST001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "get_rental_days_balance_by_driver",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{songa_integration_auth_token}}",
+                "description": "",
+                "disabled": false,
+                "type": "default"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "",
+            "url": {
+              "raw": "{{songa_integration_base_url}}api/method/songa_mobility_phase_2.songa_app_integration.utils.utils.get_rental_days_balance_by_driver",
+              "protocol": "",
+              "host": [
+                "{{songa_integration_base_url}}api"
+              ],
+              "path": [
+                "method",
+                "songa_mobility_phase_2.songa_app_integration.utils.utils.get_rental_days_balance_by_driver"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driver_id\": \"TEST001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "get_overall_balance",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{songa_integration_auth_token}}",
+                "description": "",
+                "disabled": false,
+                "type": "default"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "",
+            "url": {
+              "raw": "{{songa_integration_base_url}}api/method/songa_mobility_phase_2.songa_app_integration.utils.utils.get_overall_balance",
+              "protocol": "",
+              "host": [
+                "{{songa_integration_base_url}}api"
+              ],
+              "path": [
+                "method",
+                "songa_mobility_phase_2.songa_app_integration.utils.utils.get_overall_balance"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driver_id\": \"TEST001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "songa_backend_webhook",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "",
+            "url": {
+              "raw": "https://api.dev.songa.mobi/webhook/erp",
+              "protocol": "https",
+              "host": [
+                "api",
+                "dev",
+                "songa",
+                "mobi"
+              ],
+              "path": [
+                "webhook",
+                "erp"
+              ],
+              "query": [],
+              "variable": []
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "songa_integration_base_url",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "songa_integration_auth_token",
+      "value": "",
+      "type": "default"
+    }
+  ]
+}

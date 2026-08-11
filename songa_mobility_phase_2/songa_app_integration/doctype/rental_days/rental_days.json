@@ -19,6 +19,7 @@
   "section_break_wtoa",
   "driver_commission_ledger",
   "mpesa_express_request",
+  "mpesa_c2b_payment_register",
   "column_break_fzfe",
   "status",
   "section_break_8lt6",
@@ -103,11 +104,10 @@
   },
   {
    "allow_on_submit": 1,
-   "depends_on": "eval: doc.transaction_type == \"Recharge\" && !doc.mpesa_express_request",
+   "depends_on": "eval: doc.transaction_type == \"Recharge\" && !doc.mpesa_express_request && !doc.mpesa_c2b_payment_register",
    "fieldname": "driver_commission_ledger",
    "fieldtype": "Link",
    "label": "Driver Commission Ledger",
-   "mandatory_depends_on": "eval: doc.transaction_type == \"Recharge\" && !doc.mpesa_express_request",
    "options": "Driver Commission Ledger",
    "read_only": 1
   },
@@ -136,12 +136,20 @@
   },
   {
    "allow_on_submit": 1,
-   "depends_on": "eval: doc.transaction_type == \"Recharge\" && !doc.driver_commission_ledger",
+   "depends_on": "eval: doc.transaction_type == \"Recharge\" && !doc.driver_commission_ledger && !doc.mpesa_c2b_payment_register",
    "fieldname": "mpesa_express_request",
    "fieldtype": "Link",
    "label": "Mpesa Express Request",
-   "mandatory_depends_on": "eval: doc.transaction_type == \"Recharge\" && !doc.driver_commission_ledger",
    "options": "Mpesa Express Request",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "depends_on": "eval: doc.transaction_type == \"Recharge\" && !doc.driver_commission_ledger && !doc.mpesa_express_request",
+   "fieldname": "mpesa_c2b_payment_register",
+   "fieldtype": "Link",
+   "label": "Mpesa C2B Payment Register",
+   "options": "Mpesa C2B Payment Register",
    "read_only": 1
   },
   {
@@ -162,11 +170,11 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-26 10:23:56.566299",
+ "modified": "2026-07-23 10:42:15.566264",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Rental Days",
- "naming_rule": "Expression",
+ "naming_rule": "Expression (old style)",
  "owner": "Administrator",
  "permissions": [
   {

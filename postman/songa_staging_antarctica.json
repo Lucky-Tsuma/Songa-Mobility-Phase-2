@@ -1,0 +1,24 @@
+{
+  "name": "songa staging antarctica",
+  "variables": [
+    {
+      "name": "songa_integration_base_url",
+      "value": "https://staging.erpnext.kisiisc.org/",
+      "type": "text",
+      "enabled": true,
+      "secret": false
+    },
+    {
+      "name": "songa_integration_auth_token",
+      "value": "",
+      "type": "text",
+      "enabled": true,
+      "secret": true
+    }
+  ],
+  "info": {
+    "type": "bruno-environment",
+    "exportedAt": "2026-08-08T07:36:44.270Z",
+    "exportedUsing": "Bruno/v4.0.0"
+  }
+}

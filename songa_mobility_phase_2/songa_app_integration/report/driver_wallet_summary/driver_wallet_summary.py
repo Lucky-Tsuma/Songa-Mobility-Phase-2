@@ -101,9 +101,7 @@ def get_data(filters):
 def get_last_activity(driver_id):
 	dates = []
 	for doctype in WALLET_DOCTYPES:
-		latest = frappe.db.get_value(
-			doctype, {"driver": driver_id, "docstatus": 1}, "max(posting_date)"
-		)
+		latest = frappe.db.get_value(doctype, {"driver": driver_id, "docstatus": 1}, "max(posting_date)")
 		if latest:
 			dates.append(latest)
 	return max(dates) if dates else None

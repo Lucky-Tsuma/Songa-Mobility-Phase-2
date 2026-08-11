@@ -1,0 +1,112 @@
+import unittest
+from unittest.mock import MagicMock, patch
+
+from songa_mobility_phase_2.songa_app_integration.overrides import mpesa_express
+
+
+class TestMpesaExpressAutoProcess(unittest.TestCase):
+	def setUp(self):
+		mpesa_express._PATCHED = False
+
+	def tearDown(self):
+		mpesa_express._PATCHED = False
+
+	def _express_doc(self, **overrides):
+		doc = MagicMock()
+		doc.name = "MER-001"
+		doc.reference_doctype = "Payment Request"
+		doc.status = "Completed"
+		for key, value in overrides.items():
+			setattr(doc, key, value)
+		return doc
+
+	@patch("songa_mobility_phase_2.songa_app_integration.utils.utils.process_mpesa_express_request")
+	@patch("frappe.get_doc")
+	def test_auto_process_runs_for_completed_wallet(self, get_doc, process):
+		get_doc.return_value = self._express_doc()
+
+		mpesa_express.auto_process_mpesa_express_wallet("MER-001")
+
+		process.assert_called_once()
+		self.assertEqual(process.call_args.args[0].name, "MER-001")
+
+	@patch("songa_mobility_phase_2.songa_app_integration.utils.utils.process_mpesa_express_request")
+	@patch("frappe.get_doc")
+	def test_auto_process_allows_payment_request_reference(self, get_doc, process):
+		get_doc.return_value = self._express_doc(reference_doctype="Payment Request")
+
+		mpesa_express.auto_process_mpesa_express_wallet("MER-001")
+
+		process.assert_called_once()
+
+	@patch("songa_mobility_phase_2.songa_app_integration.utils.utils.process_mpesa_express_request")
+	@patch("frappe.get_doc")
+	def test_auto_process_skips_non_terminal(self, get_doc, process):
+		get_doc.return_value = self._express_doc(status="In Progress")
+
+		mpesa_express.auto_process_mpesa_express_wallet("MER-001")
+
+		process.assert_not_called()
+
+	@patch(
+		"songa_mobility_phase_2.songa_app_integration.utils.utils.process_mpesa_express_request",
+		side_effect=Exception("processing failed"),
+	)
+	@patch("frappe.get_doc")
+	@patch("frappe.log_error")
+	def test_auto_process_logs_failure(self, _log, get_doc, process):
+		get_doc.return_value = self._express_doc()
+
+		mpesa_express.auto_process_mpesa_express_wallet("MER-001")
+
+		_log.assert_called()
+
+	def test_wrapped_status_update_triggers_auto_process(self):
+		original = MagicMock()
+		wrapped = mpesa_express._wrapped_update_mpesa_request_status(original)
+
+		with patch.object(mpesa_express, "auto_process_mpesa_express_wallet") as auto_process:
+			wrapped("MER-001", {"status": "Completed", "result_code": "0"})
+
+		original.assert_called_once_with("MER-001", {"status": "Completed", "result_code": "0"})
+		auto_process.assert_called_once_with("MER-001")
+
+	def test_wrapped_status_update_ignores_in_progress(self):
+		original = MagicMock()
+		wrapped = mpesa_express._wrapped_update_mpesa_request_status(original)
+
+		with patch.object(mpesa_express, "auto_process_mpesa_express_wallet") as auto_process:
+			wrapped("MER-001", {"status": "In Progress"})
+
+		original.assert_called_once()
+		auto_process.assert_not_called()
+
+	def test_wrapped_reconcile_uses_songa_path_for_payment_request(self):
+		original = MagicMock()
+		wrapped = mpesa_express._wrapped_handle_successful_transaction(original)
+		request_doc = MagicMock()
+		request_doc.get.side_effect = lambda key, default=None: (
+			"Payment Request" if key == "reference_doctype" else default
+		)
+		settings = MagicMock()
+
+		with patch.object(mpesa_express, "_handle_payment_request_successful_transaction") as songa_handler:
+			wrapped(request_doc, settings)
+
+		songa_handler.assert_called_once_with(request_doc, settings)
+		original.assert_not_called()
+
+	def test_wrapped_reconcile_delegates_non_payment_request(self):
+		original = MagicMock()
+		wrapped = mpesa_express._wrapped_handle_successful_transaction(original)
+		request_doc = MagicMock()
+		request_doc.get.side_effect = lambda key, default=None: (
+			"Rental Days" if key == "reference_doctype" else default
+		)
+		settings = MagicMock()
+
+		with patch.object(mpesa_express, "_handle_payment_request_successful_transaction") as songa_handler:
+			wrapped(request_doc, settings)
+
+		songa_handler.assert_not_called()
+		original.assert_called_once_with(request_doc, settings)

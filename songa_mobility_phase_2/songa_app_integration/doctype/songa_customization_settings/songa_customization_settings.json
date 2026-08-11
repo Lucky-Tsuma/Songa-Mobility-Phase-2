@@ -7,9 +7,41 @@
  "field_order": [
   "driver_commission_accounts_section",
   "driver_commission_account",
-  "stk_push_payment_gateway",
   "column_break_lpcu",
+  "driver_parent_supplier_group",
+  "stk_push_section",
+  "mpesa_express_mode_of_payment",
+  "column_break_rvsu",
+  "payment_gateway_account",
+  "mpesa_c2b_section",
+  "mpesa_c2b_mode_of_payment",
+  "column_break_njxf",
+  "songa_developer_settings_section",
   "songa_webhook_endpoint",
+  "column_break_shns",
+  "battery_swap_tab",
+  "commission_battery_swap_section",
+  "battery_swap_commission_debit",
+  "column_break_okwx",
+  "battery_swap_commission_credit",
+  "section_break_mrpu",
+  "battery_swap_item",
+  "column_break_hopr",
+  "rental_recharge_tab",
+  "commission_rental_recharge_section",
+  "rental_recharge_commission_debit",
+  "column_break_ntnt",
+  "rental_recharge_commission_credit",
+  "section_break_btvu",
+  "rental_recharge_item",
+  "column_break_fnms",
+  "lease_payment_tab",
+  "lease_payment_accounts_section",
+  "lease_payment_debit",
+  "column_break_lease",
+  "lease_payment_credit",
+  "section_break_lease_cc",
+  "lease_payment_cost_center",
   "asset_repair_tab",
   "stock_expense_accounts_section",
   "lease_to_own",
@@ -19,17 +51,20 @@
  "fields": [
   {
    "fieldname": "driver_commission_accounts_section",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Driver & Commission"
+  },
+  {
+   "description": "Leaf supplier groups under this parent are offered on the Driver form (Supplier Group).",
+   "fieldname": "driver_parent_supplier_group",
+   "fieldtype": "Link",
+   "label": "Driver Parent Supplier Group",
+   "options": "Supplier Group",
+   "reqd": 1
   },
   {
    "fieldname": "column_break_lpcu",
    "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "stk_push_payment_gateway",
-   "fieldtype": "Link",
-   "label": "STK Push payment gateway",
-   "options": "Payment Gateway"
   },
   {
    "fieldname": "songa_webhook_endpoint",
@@ -71,13 +106,191 @@
    "fieldtype": "Link",
    "label": "Internal consumption",
    "options": "Account"
+  },
+  {
+   "fieldname": "battery_swap_tab",
+   "fieldtype": "Tab Break",
+   "label": "Battery Swap"
+  },
+  {
+   "fieldname": "commission_battery_swap_section",
+   "fieldtype": "Section Break",
+   "label": "Commission"
+  },
+  {
+   "fieldname": "battery_swap_commission_debit",
+   "fieldtype": "Link",
+   "label": "Debit Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_okwx",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "battery_swap_commission_credit",
+   "fieldtype": "Link",
+   "label": "Credit Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "rental_recharge_tab",
+   "fieldtype": "Tab Break",
+   "label": "Rental Recharge"
+  },
+  {
+   "fieldname": "commission_rental_recharge_section",
+   "fieldtype": "Section Break",
+   "label": "Commission"
+  },
+  {
+   "fieldname": "rental_recharge_commission_debit",
+   "fieldtype": "Link",
+   "label": "Debit Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_ntnt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "rental_recharge_commission_credit",
+   "fieldtype": "Link",
+   "label": "Credit Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "lease_payment_tab",
+   "fieldtype": "Tab Break",
+   "label": "Lease Payment"
+  },
+  {
+   "fieldname": "lease_payment_accounts_section",
+   "fieldtype": "Section Break",
+   "label": "Accounts"
+  },
+  {
+   "fieldname": "lease_payment_debit",
+   "fieldtype": "Link",
+   "label": "Debit Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_lease",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "lease_payment_credit",
+   "fieldtype": "Link",
+   "label": "Credit Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_lease_cc",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "lease_payment_cost_center",
+   "fieldtype": "Link",
+   "label": "Cost Center",
+   "options": "Cost Center",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_mrpu",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "This item will be used when creating invoices used for battery swap.",
+   "fieldname": "battery_swap_item",
+   "fieldtype": "Link",
+   "label": "Battery Swap Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_hopr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_btvu",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "This item will be used when creating invoices used for rental recharge.",
+   "fieldname": "rental_recharge_item",
+   "fieldtype": "Link",
+   "label": "Rental Recharge Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_fnms",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "stk_push_section",
+   "fieldtype": "Section Break",
+   "label": "STK Push"
+  },
+  {
+   "fieldname": "column_break_rvsu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "songa_developer_settings_section",
+   "fieldtype": "Section Break",
+   "label": "Songa Developer Settings"
+  },
+  {
+   "fieldname": "column_break_shns",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Attached to payment request during stk push.",
+   "fieldname": "payment_gateway_account",
+   "fieldtype": "Link",
+   "label": "Payment Gateway Account",
+   "options": "Payment Gateway Account",
+   "reqd": 1
+  },
+  {
+   "description": "Attached to payment request during stk push.",
+   "fieldname": "mpesa_express_mode_of_payment",
+   "fieldtype": "Link",
+   "label": "Mode Of Payment",
+   "options": "Mode of Payment",
+   "reqd": 1
+  },
+  {
+   "fieldname": "mpesa_c2b_section",
+   "fieldtype": "Section Break",
+   "label": "Mpesa C2B"
+  },
+  {
+   "fieldname": "column_break_njxf",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Used if mode of payment on c2b payment record is not set",
+   "fieldname": "mpesa_c2b_mode_of_payment",
+   "fieldtype": "Link",
+   "label": "Mode Of Payment",
+   "options": "Mode of Payment",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-06-08 10:58:13.107854",
+ "modified": "2026-08-07 09:07:21.953370",
  "modified_by": "Administrator",
  "module": "Songa App Integration",
  "name": "Songa Customization Settings",

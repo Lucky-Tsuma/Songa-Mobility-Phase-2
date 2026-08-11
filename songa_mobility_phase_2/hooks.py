@@ -51,7 +51,11 @@ app_include_js = [
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {
+	"Mpesa Express Request": "public/js/mpesa_express_request.js",
+	"Rental Days": "public/js/wallet_c2b_link.js",
+	"Energy KWh": "public/js/wallet_c2b_link.js",
+}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -139,7 +143,7 @@ app_include_js = [
 
 # override_doctype_class = {
 # 	"ToDo": "custom_app.overrides.CustomToDo"
-# }	
+# }
 
 # Document Events
 # ---------------
@@ -149,9 +153,6 @@ doc_events = {
 	"Driver Commission Ledger": {
 		"on_update": "songa_mobility_phase_2.services.workflow_handlers.handle_commission_ledger_workflow.handle_commission_ledger_workflow"
 	},
-	"Comment": {
-		"on_update": "songa_mobility_phase_2.songa_app_integration.events.events.on_comment_update",
-	},
 	"Asset Repair": {
 		"validate": "songa_mobility_phase_2.songa_app_integration.events.events.on_asset_repair_validate",
 		"on_update": "songa_mobility_phase_2.songa_app_integration.events.events.on_asset_repair_update",
@@ -159,17 +160,23 @@ doc_events = {
 	"Driver": {
 		"after_insert": "songa_mobility_phase_2.songa_app_integration.events.events.on_driver_insert",
 	},
-    "Payment Entry": {
+	"Payment Entry": {
 		"on_submit": "songa_mobility_phase_2.songa_app_integration.events.events.on_payment_entry_submit",
 	},
 	"Journal Entry": {
 		"on_submit": "songa_mobility_phase_2.songa_app_integration.events.events.on_journal_entry_submit",
 	},
-    "Purchase Invoice": {
+	"Purchase Invoice": {
 		"validate": "songa_mobility_phase_2.songa_app_integration.events.events.on_purchase_invoice_validate",
 	},
 	"Stock Entry": {
 		"validate": "songa_mobility_phase_2.songa_app_integration.events.events.on_stock_entry_validate",
+	},
+	"Mpesa C2B Payment Register": {
+		"on_submit": (
+			"songa_mobility_phase_2.songa_app_integration.events.events"
+			".on_mpesa_c2b_payment_register_submit"
+		),
 	},
 }
 
@@ -178,9 +185,10 @@ doc_events = {
 
 scheduler_events = {
 	"cron": {
-		"* * * * *": [
-			"songa_mobility_phase_2.songa_app_integration.utils.tasks.process_pending_mpesa_express_requests"
-		]
+		"*/5 * * * *": [
+			"songa_mobility_phase_2.songa_app_integration.utils.tasks.process_pending_mpesa_express_requests",
+			"songa_mobility_phase_2.songa_app_integration.utils.tasks.retry_failed_songa_webhooks",
+		],
 	}
 	# 	"all": [
 	# 		"songa_mobility_phase_2.tasks.all"
@@ -207,9 +215,14 @@ scheduler_events = {
 # Overriding Methods
 # ------------------------------
 #
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "songa_mobility_phase_2.event.get_events"
-# }
+# STK callbacks update Express status via db.set_value (no doc events). Override
+# the callback so Songa patches are applied: wallet auto-process, and Payment
+# Request reconcile that creates PE before Webshop zeros outstanding.
+override_whitelisted_methods = {
+	"frappe_mpsa_payments.frappe_mpsa_payments.api.m_pesa_api.stk_push_callback": (
+		"songa_mobility_phase_2.songa_app_integration.overrides.mpesa_express.stk_push_callback"
+	),
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
@@ -229,12 +242,12 @@ scheduler_events = {
 
 # Request Events
 # ----------------
-# before_request = ["songa_mobility_phase_2.utils.before_request"]
+before_request = ["songa_mobility_phase_2.songa_app_integration.overrides.mpesa_express.apply_patches"]
 # after_request = ["songa_mobility_phase_2.utils.after_request"]
 
 # Job Events
 # ----------
-# before_job = ["songa_mobility_phase_2.utils.before_job"]
+before_job = ["songa_mobility_phase_2.songa_app_integration.overrides.mpesa_express.apply_patches"]
 # after_job = ["songa_mobility_phase_2.utils.after_job"]
 
 # User Data Protection
@@ -280,12 +293,54 @@ fixtures = [
 		"dt": "Custom Field",
 		"filters": {"module": ["in", ["Songa App Integration", "Songa Mobility Phase 2"]]},
 	},
-	{"dt": "Workflow", "filters": {"document_type": ["in", ["Driver Commission Ledger", "Asset Repair"]]}},
-	{"dt": "Role", "filters": {"name": ["in", ["Songa App", "Commission Ledger Approver"]]}},
+	{
+		"dt": "Workflow",
+		"filters": {"document_type": ["in", ["Driver Commission Ledger", "Asset Repair"]]},
+	},
+	{
+		"dt": "Role",
+		"filters": {"name": ["in", ["Songa App", "Commission Ledger Approver"]]},
+	},
 	{"dt": "Notification", "filters": {"document_type": ["in", ["Asset Repair"]]}},
 	"Workflow State",
 	"Workflow Action Master",
-	"Custom DocPerm",
+	{
+		"dt": "Custom DocPerm",
+		"filters": {
+			"role": [
+				"in",
+				[
+					"Songa App",
+					"Commission Ledger Approver",
+					"Technical Agent",
+					"Lead Technician",
+					"Hub Manager",
+					"Stock User",
+				],
+			],
+			"parent": [
+				"in",
+				[
+					"Asset",
+					"Asset Repair",
+					"Driver Commission Ledger",
+					"Energy KWh",
+					"Item",
+					"Journal Entry",
+					"Material Request",
+					"Mpesa Express Request",
+					"Mpesa C2B Payment Register",
+					"Payment Request",
+					"Purchase Invoice",
+					"Rental Days",
+					"Sales Invoice",
+					"Songa Customization Settings",
+					"Songa Webhook Log",
+					"Stock Entry",
+				],
+			],
+		},
+	},
 	"Asset Type",
 	"Severity Type",
 ]

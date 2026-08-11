@@ -21,7 +21,11 @@ frappe.query_reports["Driver Wallet Summary"] = {
 	formatter: function (value, row, column, data, default_formatter) {
 		value = default_formatter(value, row, column, data);
 
-		if (data && column.fieldname === "commission_balance" && flt(data.commission_balance) < 0) {
+		if (
+			data &&
+			column.fieldname === "commission_balance" &&
+			flt(data.commission_balance) < 0
+		) {
 			value = `<span style="color: var(--red-500);">${value}</span>`;
 		}
 
