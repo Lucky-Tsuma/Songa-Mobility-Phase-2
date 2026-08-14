@@ -70,7 +70,7 @@ This app is the integration layer that:
 <td align="center"><strong>6</strong><br>Script reports</td>
 <td align="center"><strong>2</strong><br>Dashboards</td>
 <td align="center"><strong>7</strong><br>App DocTypes</td>
-<td align="center"><strong>12</strong><br>Platform API methods</td>
+<td align="center"><strong>13</strong><br>Platform API methods</td>
 <td align="center"><strong>2</strong><br>Workflows</td>
 </tr>
 </table>
@@ -749,6 +749,119 @@ Cancels the wallet document and reverses linked commission ledger, M-Pesa Expres
 ```
 
 **Errors** — same pattern as `cancel_rental_days` with `Energy KWh` in messages.
+
+<br>
+
+#### `check_stk_push_status`
+
+Returns the current **Mpesa Express Request** status for a wallet STK recharge. Pass the `mpesa_request` value returned by `recharge_rental_days` / `recharge_kwh` when `payment_method` is `mpesa`.
+
+| Field | Required | Description |
+|-------|:--------:|-------------|
+| `mpesa_request` | ✅ | Mpesa Express Request name |
+
+`stk_status` is one of `In Progress`, `Completed`, or `Failed`. Wallet fields are included when the Express request is linked to a Rental Days or Energy KWh recharge.
+
+**Request**
+
+```json
+{
+  "mpesa_request": "MEXP.-26.-08.-000045"
+}
+```
+
+**Success `200` — Completed**
+
+```json
+{
+  "status": "success",
+  "message": {
+    "mpesa_request": "MEXP.-26.-08.-000045",
+    "stk_status": "Completed",
+    "amount": 1500.0,
+    "phone_number": "2547########",
+    "transaction_id": "NLJ7RT61SV",
+    "transaction_date": "2026-08-14 06:40:00",
+    "result_code": "0",
+    "result_desc": "The service request is processed successfully.",
+    "wallet_doctype": "Rental Days",
+    "wallet_name": "TRIP-00721",
+    "wallet_status": "Completed",
+    "driver_id": "TEST001"
+  }
+}
+```
+
+**Success `200` — In Progress**
+
+```json
+{
+  "status": "success",
+  "message": {
+    "mpesa_request": "MEXP.-26.-08.-000045",
+    "stk_status": "In Progress",
+    "amount": 1500.0,
+    "phone_number": "2547########",
+    "transaction_id": null,
+    "transaction_date": null,
+    "result_code": null,
+    "result_desc": null,
+    "wallet_doctype": "Rental Days",
+    "wallet_name": "TRIP-00721",
+    "wallet_status": "In Progress",
+    "driver_id": "TEST001"
+  }
+}
+```
+
+**Success `200` — Failed**
+
+```json
+{
+  "status": "success",
+  "message": {
+    "mpesa_request": "MEXP.-26.-08.-000045",
+    "stk_status": "Failed",
+    "amount": 1500.0,
+    "phone_number": "2547########",
+    "transaction_id": null,
+    "transaction_date": "2026-08-14 06:41:00",
+    "result_code": "1032",
+    "result_desc": "Request cancelled by user",
+    "wallet_doctype": "Energy KWh",
+    "wallet_name": "KWh-00720",
+    "wallet_status": "Failed",
+    "driver_id": "TEST001"
+  }
+}
+```
+
+**Error `404` — request not found**
+
+```json
+{
+  "status": "error",
+  "message": "Mpesa Express Request not found. ID: MEXP.-26.-08.-000045"
+}
+```
+
+**Error `400` — empty body**
+
+```json
+{
+  "status": "error",
+  "message": "No data provided"
+}
+```
+
+**Error `500` — missing `mpesa_request`**
+
+```json
+{
+  "status": "error",
+  "message": "Missing required fields: mpesa_request"
+}
+```
 
 <br>
 

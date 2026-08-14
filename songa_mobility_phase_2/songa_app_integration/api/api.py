@@ -1219,3 +1219,60 @@ def update_asset_repair():
 		frappe.db.rollback()
 		frappe.local.response["http_status_code"] = 500
 		return {"status": "error", "message": str(e)}
+
+
+def _get_wallet_linked_to_express_request(mpesa_request):
+	for wallet_doctype in ("Rental Days", "Energy KWh"):
+		wallet = frappe.db.get_value(
+			wallet_doctype,
+			{"mpesa_express_request": mpesa_request},
+			["name", "driver", "status"],
+			as_dict=True,
+		)
+		if wallet:
+			return wallet_doctype, wallet
+	return None, None
+
+
+@frappe.whitelist(allow_guest=False)
+def check_stk_push_status():
+	try:
+		data = check_for_empty_payload()
+
+		if isinstance(data, dict) and data.get("status") == "error":
+			return data
+
+		check_for_empty_values(data, ["mpesa_request"])
+
+		mpesa_request = data.get("mpesa_request")
+
+		if not frappe.db.exists("Mpesa Express Request", mpesa_request):
+			frappe.local.response["http_status_code"] = 404
+			return {
+				"status": "error",
+				"message": f"Mpesa Express Request not found. ID: {mpesa_request}",
+			}
+
+		doc = frappe.get_doc("Mpesa Express Request", mpesa_request)
+		message = {
+			"mpesa_request": doc.name,
+			"stk_status": doc.status,
+			"amount": doc.amount,
+			"phone_number": doc.phone_number,
+			"transaction_id": doc.transaction_id,
+			"transaction_date": str(doc.transaction_date) if doc.transaction_date else None,
+			"result_code": doc.result_code,
+			"result_desc": doc.result_desc,
+		}
+
+		wallet_doctype, wallet = _get_wallet_linked_to_express_request(doc.name)
+		if wallet_doctype:
+			message["wallet_doctype"] = wallet_doctype
+			message["wallet_name"] = wallet.name
+			message["wallet_status"] = wallet.status
+			message["driver_id"] = wallet.driver
+
+		return {"status": "success", "message": message}
+	except Exception as e:
+		frappe.local.response["http_status_code"] = 500
+		return {"status": "error", "message": str(e)}
