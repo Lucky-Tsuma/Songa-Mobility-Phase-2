@@ -578,6 +578,99 @@ def submit_sales_invoice(invoice):
 	return apply_workflow(invoice, "Submit")
 
 
+def cancel_sales_invoice(invoice):
+	"""Cancel a submitted Sales Invoice, using workflow Cancel when available."""
+	from frappe.model.workflow import apply_workflow, get_transitions
+
+	if isinstance(invoice, str):
+		invoice = frappe.get_doc("Sales Invoice", invoice)
+	if invoice.docstatus != 1:
+		return invoice
+
+	invoice.flags.ignore_links = True
+	invoice.flags.ignore_permissions = True
+
+	try:
+		if any(t.get("action") == "Cancel" for t in get_transitions(invoice) or []):
+			return apply_workflow(invoice, "Cancel")
+	except Exception:
+		invoice.reload()
+		if invoice.docstatus != 1:
+			return invoice
+
+	if invoice.docstatus == 1:
+		invoice.cancel()
+	return invoice
+
+
+def _cancel_submitted_doc(doctype, name):
+	if not name or not frappe.db.exists(doctype, name):
+		return
+	if frappe.db.get_value(doctype, name, "docstatus") != 1:
+		return
+
+	if doctype == "Sales Invoice":
+		cancel_sales_invoice(name)
+		return
+
+	doc = frappe.get_doc(doctype, name)
+	doc.flags.ignore_links = True
+	doc.flags.ignore_permissions = True
+	doc.cancel()
+
+
+def sales_invoice_has_submitted_payment_entry(sales_invoice_name):
+	if not sales_invoice_name:
+		return False
+	parents = frappe.get_all(
+		"Payment Entry Reference",
+		filters={
+			"reference_doctype": "Sales Invoice",
+			"reference_name": sales_invoice_name,
+		},
+		pluck="parent",
+	)
+	for pe_name in parents:
+		if frappe.db.get_value("Payment Entry", pe_name, "docstatus") == 1:
+			return True
+	return False
+
+
+def cancel_express_billing_chain(express_doc):
+	"""Cancel unpaid Express → Payment Request → Sales Invoice. Idempotent."""
+	if isinstance(express_doc, str):
+		if not frappe.db.exists("Mpesa Express Request", express_doc):
+			return
+		express_doc = frappe.get_doc("Mpesa Express Request", express_doc)
+
+	pr_name = None
+	si_name = None
+	if express_doc.reference_doctype == "Payment Request" and express_doc.reference_name:
+		pr_name = express_doc.reference_name
+		if frappe.db.exists("Payment Request", pr_name):
+			pr = frappe.db.get_value(
+				"Payment Request",
+				pr_name,
+				["reference_doctype", "reference_name"],
+				as_dict=True,
+			)
+			if pr and pr.reference_doctype == "Sales Invoice":
+				si_name = pr.reference_name
+
+	if express_doc.docstatus == 1:
+		express_doc.flags.ignore_links = True
+		express_doc.flags.ignore_permissions = True
+		express_doc.cancel()
+
+	_cancel_submitted_doc("Payment Request", pr_name)
+
+	if si_name and sales_invoice_has_submitted_payment_entry(si_name):
+		frappe.logger().info(f"Skipped cancelling Sales Invoice {si_name}: submitted Payment Entry exists.")
+		return
+
+	_cancel_submitted_doc("Sales Invoice", si_name)
+
+
 def _wallet_si_remarks(wallet_doctype, wallet_name):
 	return f"Songa Wallet|{wallet_doctype}|{wallet_name}"
 
@@ -1200,6 +1293,12 @@ def process_mpesa_express_request(doc):
 
 				send_songa_webhook(payload, context="Mpesa Express Request")
 		else:
+			try:
+				frappe.db.savepoint("cancel_express_billing_chain")
+				cancel_express_billing_chain(doc)
+			except Exception:
+				frappe.db.rollback(save_point="cancel_express_billing_chain")
+				raise
 			frappe.logger().info(
 				f"{wallet_doctype} recharge cancelled for driver {wallet.driver} "
 				f"due to failed M-Pesa payment."

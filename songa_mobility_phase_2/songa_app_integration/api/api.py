@@ -7,6 +7,8 @@ from frappe.model.workflow import apply_workflow
 
 from ..utils.utils import (
 	_find_sales_invoice_for_wallet,
+	cancel_express_billing_chain,
+	cancel_sales_invoice,
 	create_wallet_c2b_sales_invoice,
 	create_wallet_mpesa_express_request,
 	find_eligible_c2b_by_transid,
@@ -857,21 +859,7 @@ def _cancel_document(doctype, document_id, id_field):
 			elif driver_commission_ledger.workflow_state == "Pending":
 				apply_workflow(driver_commission_ledger, "Reject")
 		elif doc.mpesa_express_request:
-			mpesa_express_request = frappe.get_doc("Mpesa Express Request", doc.mpesa_express_request)
-			mpesa_express_request.flags.ignore_links = True
-			mpesa_express_request.cancel()
-			if mpesa_express_request.reference_doctype == "Payment Request":
-				payment_request = frappe.get_doc("Payment Request", mpesa_express_request.reference_name)
-				if payment_request.docstatus == 1:
-					payment_request.flags.ignore_links = True
-					payment_request.flags.ignore_permissions = True
-					payment_request.cancel()
-				if payment_request.reference_doctype == "Sales Invoice":
-					sales_invoice = frappe.get_doc("Sales Invoice", payment_request.reference_name)
-					if sales_invoice.docstatus == 1:
-						sales_invoice.flags.ignore_links = True
-						sales_invoice.flags.ignore_permissions = True
-						sales_invoice.cancel()
+			cancel_express_billing_chain(doc.mpesa_express_request)
 		elif doc.get("mpesa_c2b_payment_register"):
 			c2b_name = doc.mpesa_c2b_payment_register
 			sales_invoice_name = _find_sales_invoice_for_wallet(doctype, doc.name)
@@ -887,10 +875,7 @@ def _cancel_document(doctype, document_id, id_field):
 			if sales_invoice_name:
 				si_docstatus = frappe.db.get_value("Sales Invoice", sales_invoice_name, "docstatus")
 				if si_docstatus == 1:
-					sales_invoice = frappe.get_doc("Sales Invoice", sales_invoice_name)
-					sales_invoice.flags.ignore_links = True
-					sales_invoice.flags.ignore_permissions = True
-					sales_invoice.cancel()
+					cancel_sales_invoice(sales_invoice_name)
 
 	except Exception:
 		_rollback_savepoint(savepoint)

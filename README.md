@@ -217,6 +217,7 @@ Wallet M-Pesa recharges post GL through **ERPNext Payment Entry** against a **Sa
 | **C2B (`mpesa_c2b`)** | Sales Invoice at wallet create → Mpesa C2B Payment Register → Payment Entry against that SI | From C2B register, else Songa Customization Settings `mpesa_c2b_mode_of_payment` |
 
 - SI party is `Driver.customer`; line qty `1`, rate = wallet amount; SI is submitted via workflow action **Submit**.
+- For **Express (`mpesa`)**, a Failed STK marks the wallet Failed and cancels the unpaid billing chain *(Express → Payment Request → Sales Invoice)* so a retry does not leave a second outstanding invoice. An SI with a submitted Payment Entry is left in place.
 - For C2B without `transaction_id`, the API returns `sales_invoice` — use that name as the PayBill account reference (BillRef) so mpsa can auto-match; when the C2B register is submitted against that SI, Songa links it to the wallet and completes the recharge automatically. Desk link/Complete remains available as a fallback.
 - Cancel reverses the Songa billing chain (Express: Express → PR → SI; C2B: PE → SI) and clears wallet↔C2B links.
 
@@ -1328,7 +1329,7 @@ Webhook desk helpers live under `songa_mobility_phase_2.songa_app_integration.ut
 
 ### M-Pesa Express auto-processing
 
-When an STK callback (or transaction-status query) sets **Mpesa Express Request** to `Completed` / `Failed`, Songa immediately runs `process_mpesa_express_request` for wallet-linked requests *(Rental Days / Energy KWh)*. Payment Entry is created on the Payment Request path before wallet completion. This is required because mpsa writes status with `db.set_value` (no document events). Desk **Process Wallet** remains for manual re-sync.
+When an STK callback (or transaction-status query) sets **Mpesa Express Request** to `Completed` / `Failed`, Songa immediately runs `process_mpesa_express_request` for wallet-linked requests *(Rental Days / Energy KWh)*. On **Completed**, Payment Entry is created on the Payment Request path before wallet completion. On **Failed**, the unpaid Express → Payment Request → Sales Invoice chain is cancelled. This is required because mpsa writes status with `db.set_value` (no document events). Desk **Process Wallet** remains for manual re-sync.
 
 ### Document events
 
