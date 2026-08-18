@@ -70,7 +70,7 @@ This app is the integration layer that:
 <td align="center"><strong>6</strong><br>Script reports</td>
 <td align="center"><strong>2</strong><br>Dashboards</td>
 <td align="center"><strong>7</strong><br>App DocTypes</td>
-<td align="center"><strong>12</strong><br>Platform API methods</td>
+<td align="center"><strong>13</strong><br>Platform API methods</td>
 <td align="center"><strong>2</strong><br>Workflows</td>
 </tr>
 </table>
@@ -217,6 +217,7 @@ Wallet M-Pesa recharges post GL through **ERPNext Payment Entry** against a **Sa
 | **C2B (`mpesa_c2b`)** | Sales Invoice at wallet create → Mpesa C2B Payment Register → Payment Entry against that SI | From C2B register, else Songa Customization Settings `mpesa_c2b_mode_of_payment` |
 
 - SI party is `Driver.customer`; line qty `1`, rate = wallet amount; SI is submitted via workflow action **Submit**.
+- For **Express (`mpesa`)**, a Failed STK marks the wallet Failed and cancels the unpaid billing chain *(Express → Payment Request → Sales Invoice)* so a retry does not leave a second outstanding invoice. An SI with a submitted Payment Entry is left in place.
 - For C2B without `transaction_id`, the API returns `sales_invoice` — use that name as the PayBill account reference (BillRef) so mpsa can auto-match; when the C2B register is submitted against that SI, Songa links it to the wallet and completes the recharge automatically. Desk link/Complete remains available as a fallback.
 - Cancel reverses the Songa billing chain (Express: Express → PR → SI; C2B: PE → SI) and clears wallet↔C2B links.
 
@@ -752,6 +753,119 @@ Cancels the wallet document and reverses linked commission ledger, M-Pesa Expres
 
 <br>
 
+#### `check_stk_push_status`
+
+Returns the current **Mpesa Express Request** status for a wallet STK recharge. Pass the `mpesa_request` value returned by `recharge_rental_days` / `recharge_kwh` when `payment_method` is `mpesa`.
+
+| Field | Required | Description |
+|-------|:--------:|-------------|
+| `mpesa_request` | ✅ | Mpesa Express Request name |
+
+`stk_status` is one of `In Progress`, `Completed`, or `Failed`. Wallet fields are included when the Express request is linked to a Rental Days or Energy KWh recharge.
+
+**Request**
+
+```json
+{
+  "mpesa_request": "MEXP.-26.-08.-000045"
+}
+```
+
+**Success `200` — Completed**
+
+```json
+{
+  "status": "success",
+  "message": {
+    "mpesa_request": "MEXP.-26.-08.-000045",
+    "stk_status": "Completed",
+    "amount": 1500.0,
+    "phone_number": "2547########",
+    "transaction_id": "NLJ7RT61SV",
+    "transaction_date": "2026-08-14 06:40:00",
+    "result_code": "0",
+    "result_desc": "The service request is processed successfully.",
+    "wallet_doctype": "Rental Days",
+    "wallet_name": "TRIP-00721",
+    "wallet_status": "Completed",
+    "driver_id": "TEST001"
+  }
+}
+```
+
+**Success `200` — In Progress**
+
+```json
+{
+  "status": "success",
+  "message": {
+    "mpesa_request": "MEXP.-26.-08.-000045",
+    "stk_status": "In Progress",
+    "amount": 1500.0,
+    "phone_number": "2547########",
+    "transaction_id": null,
+    "transaction_date": null,
+    "result_code": null,
+    "result_desc": null,
+    "wallet_doctype": "Rental Days",
+    "wallet_name": "TRIP-00721",
+    "wallet_status": "In Progress",
+    "driver_id": "TEST001"
+  }
+}
+```
+
+**Success `200` — Failed**
+
+```json
+{
+  "status": "success",
+  "message": {
+    "mpesa_request": "MEXP.-26.-08.-000045",
+    "stk_status": "Failed",
+    "amount": 1500.0,
+    "phone_number": "2547########",
+    "transaction_id": null,
+    "transaction_date": "2026-08-14 06:41:00",
+    "result_code": "1032",
+    "result_desc": "Request cancelled by user",
+    "wallet_doctype": "Energy KWh",
+    "wallet_name": "KWh-00720",
+    "wallet_status": "Failed",
+    "driver_id": "TEST001"
+  }
+}
+```
+
+**Error `404` — request not found**
+
+```json
+{
+  "status": "error",
+  "message": "Mpesa Express Request not found. ID: MEXP.-26.-08.-000045"
+}
+```
+
+**Error `400` — empty body**
+
+```json
+{
+  "status": "error",
+  "message": "No data provided"
+}
+```
+
+**Error `500` — missing `mpesa_request`**
+
+```json
+{
+  "status": "error",
+  "message": "Missing required fields: mpesa_request"
+}
+```
+
+<br>
+
 #### Balance helpers
 
 These live under `utils.utils` (see base path above). Body or query may include `driver_id`. Validation failures use `frappe.throw` *(standard Frappe error response)* for missing `driver_id` / unknown driver / missing supplier or company.
@@ -1215,7 +1329,7 @@ Webhook desk helpers live under `songa_mobility_phase_2.songa_app_integration.ut
 
 ### M-Pesa Express auto-processing
 
-When an STK callback (or transaction-status query) sets **Mpesa Express Request** to `Completed` / `Failed`, Songa immediately runs `process_mpesa_express_request` for wallet-linked requests *(Rental Days / Energy KWh)*. Payment Entry is created on the Payment Request path before wallet completion. This is required because mpsa writes status with `db.set_value` (no document events). Desk **Process Wallet** remains for manual re-sync.
+When an STK callback (or transaction-status query) sets **Mpesa Express Request** to `Completed` / `Failed`, Songa immediately runs `process_mpesa_express_request` for wallet-linked requests *(Rental Days / Energy KWh)*. On **Completed**, Payment Entry is created on the Payment Request path before wallet completion. On **Failed**, the unpaid Express → Payment Request → Sales Invoice chain is cancelled. This is required because mpsa writes status with `db.set_value` (no document events). Desk **Process Wallet** remains for manual re-sync.
 
 ### Document events
 

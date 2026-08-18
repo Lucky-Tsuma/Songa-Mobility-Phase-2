@@ -222,6 +222,47 @@
           }
         },
         {
+          "name": "check_stk_push_status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{songa_integration_auth_token}}",
+                "description": "",
+                "disabled": false,
+                "type": "default"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Returns Mpesa Express Request STK status. mpesa_request is the ID returned by recharge_rental_days / recharge_kwh when payment_method is mpesa.",
+            "url": {
+              "raw": "{{songa_integration_base_url}}api/method/songa_mobility_phase_2.songa_app_integration.api.api.check_stk_push_status",
+              "protocol": "",
+              "host": [
+                "{{songa_integration_base_url}}api"
+              ],
+              "path": [
+                "method",
+                "songa_mobility_phase_2.songa_app_integration.api.api.check_stk_push_status"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mpesa_request\": \"MEXP.-26.-08.-000045\" /* Mpesa Express Request ID from recharge_rental_days / recharge_kwh */\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
           "name": "allocate_commission",
           "request": {
             "method": "POST",
