@@ -55,6 +55,7 @@ doctype_js = {
 	"Mpesa Express Request": "public/js/mpesa_express_request.js",
 	"Rental Days": "public/js/wallet_c2b_link.js",
 	"Energy KWh": "public/js/wallet_c2b_link.js",
+	"Asset Repair": "public/js/asset_repair.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
