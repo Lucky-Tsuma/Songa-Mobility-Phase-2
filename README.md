@@ -948,6 +948,7 @@ Other common throws: `driver_id is required`, `Driver not found`, `Driver does n
 | `description` | ✅ | Error description |
 | `user_email` | ✅ | Frappe User email *(issue owner / creator context)* |
 | `company` | — | Defaults to user default company |
+| `branch` | — | Branch name; when set, stored on the Asset Repair. If omitted, defaults from the Asset on validate |
 
 Enters workflow at **Pending Approval - Technical Agent**. Idempotent on duplicate `asset_repair_id`.
 
@@ -957,6 +958,7 @@ Enters workflow at **Pending Approval - Technical Agent**. Idempotent on duplica
 {
   "asset_repair_id": "repair-020",
   "company": "",
+  "branch": "Ogembo Agri-E-Hub",
   "failure_date": "2026-07-20 08:59:00",
   "description": "Battery does not charge.",
   "user_email": "hub.manager@example.com",
@@ -993,6 +995,7 @@ Enters workflow at **Pending Approval - Technical Agent**. Idempotent on duplica
 | `404` | `User not found` |
 | `404` | `Asset Type not found` |
 | `404` | `Severity Type not found` |
+| `404` | `Branch not found: …` |
 | `403` | `User is disabled` |
 | `400` | `user_email is required` / missing required fields |
 | `500` | Unexpected exception |

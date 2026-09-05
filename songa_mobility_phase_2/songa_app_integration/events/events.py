@@ -221,9 +221,12 @@ def on_asset_repair_validate(doc, method):
 	if asset_details.cost_center:
 		doc.cost_center = asset_details.cost_center
 
-	branch = asset_details.custom_branch or asset_details.branch
-	if branch:
-		doc.branch = branch
+	# Only default branch from Asset when the repair does not already have one
+	# (e.g. create_asset_repair payload may pass branch explicitly).
+	if not doc.branch:
+		branch = asset_details.custom_branch or asset_details.branch
+		if branch:
+			doc.branch = branch
 
 
 def on_stock_entry_validate(doc, method):

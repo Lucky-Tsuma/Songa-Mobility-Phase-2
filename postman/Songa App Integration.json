@@ -84,7 +84,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"asset_repair_id\": \"repair-020\", /* mandatory */\n  \"company\": \"\", /* optional, use default company will be used if blank */\n  \"failure_date\": \"2026-07-20 08:59:00\", /* mandatory yyyy-dd-mm*/\n  \"description\": \"Battery does not charge.\", /* mandatory field */\n  \"user_email\": \"tsuma@teamweb.africa\", /* mandatory. hub manager email, used to identify issue ownwer on the system */\n  \"asset_id\": \"ACC-ASS-2024-00165\", /* optional field in case issue is linked to an asset on the system */\n  \"severity_type_id\": 3,   /* LOW, MEDIUM, SERIOUS, CRITICAL*/\n  \"asset_type_id\": 2\n}",
+              "raw": "{\n  \"asset_repair_id\": \"repair-020\", /* mandatory */\n  \"company\": \"\", /* optional, use default company will be used if blank */\n  \"branch\": \"\", /* optional Branch name */\n  \"failure_date\": \"2026-07-20 08:59:00\", /* mandatory yyyy-dd-mm*/\n  \"description\": \"Battery does not charge.\", /* mandatory field */\n  \"user_email\": \"tsuma@teamweb.africa\", /* mandatory. hub manager email, used to identify issue ownwer on the system */\n  \"asset_id\": \"ACC-ASS-2024-00165\", /* optional field in case issue is linked to an asset on the system */\n  \"severity_type_id\": 3,   /* LOW, MEDIUM, SERIOUS, CRITICAL*/\n  \"asset_type_id\": 2\n}",
               "options": {
                 "raw": {
                   "language": "json"

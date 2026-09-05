@@ -965,6 +965,7 @@ def create_asset_repair():
 		severity_type_id = data.get("severity_type_id")
 		failure_date = data.get("failure_date")
 		company = data.get("company")
+		branch = data.get("branch")
 
 		_validate_songa_actor(user_email)
 
@@ -989,6 +990,10 @@ def create_asset_repair():
 			frappe.local.response["http_status_code"] = 404
 			return {"status": "error", "message": "Severity Type not found"}
 
+		if branch and not frappe.db.exists("Branch", branch):
+			frappe.local.response["http_status_code"] = 404
+			return {"status": "error", "message": f"Branch not found: {branch}"}
+
 		try:
 			asset_repair = frappe.new_doc("Asset Repair")
 			asset_repair.company = company or frappe.defaults.get_user_default("company")
@@ -999,6 +1004,8 @@ def create_asset_repair():
 			asset_repair.custom_asset_type_id = asset_type_id
 			asset_repair.description = description
 			asset_repair.failure_date = frappe.utils.get_datetime(failure_date)
+			if branch:
+				asset_repair.branch = branch
 			asset_repair.insert()
 			frappe.db.set_value(
 				"Asset Repair",
