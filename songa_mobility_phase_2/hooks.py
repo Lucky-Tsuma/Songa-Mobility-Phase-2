@@ -338,6 +338,8 @@ fixtures = [
 					"Songa Customization Settings",
 					"Songa Webhook Log",
 					"Stock Entry",
+					"Account",
+					"Payment Entry",
 				],
 			],
 		},
