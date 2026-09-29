@@ -265,7 +265,22 @@ flowchart TD
 
 **Roles:** Technical Agent · Lead Technician · Hub Manager · Stock User
 
-> Asset Repair also has ERPNext's own `repair_status` *(Pending / Completed / Cancelled)* — separate from `workflow_state`.
+> Asset Repair also has ERPNext's own `repair_status` *(Pending / Completed / Cancelled)*. For terminal Songa workflow states it is enforced as:
+
+| `workflow_state` | `repair_status` |
+|------------------|-----------------|
+| Rejected | Pending |
+| Completed | Completed |
+| Cancelled | Cancelled |
+
+>
+> Outbound Songa webhooks fire when `workflow_state` changes to **Completed**, **Cancelled**, or **Rejected**. `action_type` is derived from `workflow_state`:
+
+| `workflow_state` | Context *(Songa Webhook Log)* | `action_type` |
+|------------------|-------------------------------|---------------|
+| Completed | `Asset Repair Completion` | `Service Completed` |
+| Cancelled | `Asset Repair Cancellation` | `Service Cancelled` |
+| Rejected | `Asset Repair Rejection` | `Service Rejected` |
 
 ---
 
@@ -1132,7 +1147,9 @@ When `stock_consumption` is set, `message.stock_items` is an array of `{ item_co
 | Driver Commission Ledger state change | `Commission Ledger Workflow` | `Approved Commission` / `Rejected Commission` / `Rental days recharge` / `Energy recharge` | `driver_id`, `commission_ledger`, `amount`, `commission_balance`, wallet ids (`rental_day_id` / `energy_kwh_id`), quantities (`no_of_days` / `kwh`), wallet balances |
 | Rental/Energy recharge via M-Pesa Express terminal completion | `Mpesa Express Request` | `Rental days recharge` / `Energy recharge` | `driver_id`, `mpesa_express_request`, `amount`, wallet id + quantity, updated wallet balance |
 | Rental/Energy recharge via linked M-Pesa C2B completion | `Mpesa C2B Payment Register` | `Rental days recharge` / `Energy recharge` | `driver_id`, `mpesa_c2b_payment_register`, `sales_invoice`, `payment_entry`, `amount`, wallet id + quantity, updated wallet balance |
-| Asset Repair completion/cancel sync | `Asset Repair Completion` | `Service Completed` / `Service Cancelled` | `asset_repair`, repair metadata, status fields |
+| Asset Repair workflow → Completed | `Asset Repair Completion` | `Service Completed` | `asset_repair`, `asset_repair_id`, `repair_status`, `workflow_state`, repair metadata, optional `stock_items` |
+| Asset Repair workflow → Cancelled | `Asset Repair Cancellation` | `Service Cancelled` | Same as completion |
+| Asset Repair workflow → Rejected | `Asset Repair Rejection` | `Service Rejected` | Same as completion *(`repair_status` forced to `Pending`)* |
 | Lease/commission accounting event hooks | `Commission Deduction Webhook` and related contexts | `Commission Deduction` | `payment_entry` or `journal_entry`, `is_lease_payment`, amount, driver/commission linkage |
 
 ### Example JSON payloads
@@ -1209,7 +1226,7 @@ When `stock_consumption` is set, `message.stock_items` is an array of `{ item_co
 }
 ```
 
-#### 5) Asset Repair completion webhook
+#### 5) Asset Repair — Completed
 
 ```json
 {
@@ -1238,6 +1255,60 @@ When `stock_consumption` is set, `message.stock_items` is an array of `{ item_co
       "total_value": 900.0
     }
   ]
+}
+```
+
+#### 5b) Asset Repair — Rejected
+
+```json
+{
+  "action_type": "Service Rejected",
+  "asset_repair": "ACC-ASR-2026-00054",
+  "asset_repair_id": "repair-0999",
+  "asset": "EASVRM/SON/0209",
+  "asset_name": "Songa 1.0-Asset",
+  "asset_type": "TRIKE",
+  "severity_type": "MEDIUM",
+  "failure_date": "2026-09-22 01:22:55",
+  "completion_date": "2026-09-22 15:54:51",
+  "repair_status": "Pending",
+  "workflow_state": "Rejected",
+  "stock_consumption": 1,
+  "total_repair_cost": 233.33,
+  "description": "to fix the canopy well",
+  "actions_performed": "Driver's seat reinforcement, welding",
+  "stock_items": [
+    {
+      "item_code": "KSC 000051",
+      "warehouse": "Magena EASVRM - EASVRM",
+      "valuation_rate": 233.33,
+      "uom": "Nos",
+      "consumed_quantity": "1",
+      "total_value": 233.33
+    }
+  ]
+}
+```
+
+#### 5c) Asset Repair — Cancelled
+
+```json
+{
+  "action_type": "Service Cancelled",
+  "asset_repair": "AR-2026-00008",
+  "asset_repair_id": "SR-REPAIR-9012",
+  "asset": "AST-TRIKE-0041",
+  "asset_name": "Trike 41",
+  "asset_type": "TRIKE",
+  "severity_type": "LOW",
+  "failure_date": "2026-08-01 09:00:00",
+  "completion_date": null,
+  "repair_status": "Cancelled",
+  "workflow_state": "Cancelled",
+  "stock_consumption": 0,
+  "total_repair_cost": 0,
+  "description": "Mis-logged ticket",
+  "actions_performed": null
 }
 ```
 
@@ -1340,7 +1411,7 @@ When an STK callback (or transaction-status query) sets **Mpesa Express Request*
 |---------|-------|---------|
 | Driver Commission Ledger | `on_update` | Webhook + auto GL on approval |
 | Driver | `after_insert` | Supplier / transporter setup |
-| Asset Repair | `validate`, `on_update` | Validation + Songa sync |
+| Asset Repair | `validate`, `on_update` | Validation + Songa webhook on workflow Completed / Cancelled / Rejected |
 | Payment Entry | `on_submit` | Lease / commission deduction webhook when applicable |
 | Journal Entry | `on_submit` | Lease payment JE → commission deduction webhook when applicable |
 | Mpesa C2B Payment Register | `on_submit` | Auto-link/complete pending wallet when C2B pays a wallet Sales Invoice |

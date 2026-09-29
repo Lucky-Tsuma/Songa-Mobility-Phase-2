@@ -1,7 +1,48 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from songa_mobility_phase_2.songa_app_integration.events.events import on_asset_repair_update
+from songa_mobility_phase_2.songa_app_integration.events.events import (
+	_sync_asset_repair_status_from_workflow,
+	on_asset_repair_update,
+)
+
+
+class TestSyncAssetRepairStatusFromWorkflow(unittest.TestCase):
+	def test_rejected_forces_pending(self):
+		doc = MagicMock()
+		doc.workflow_state = "Rejected"
+		doc.repair_status = "Completed"
+
+		_sync_asset_repair_status_from_workflow(doc)
+
+		self.assertEqual(doc.repair_status, "Pending")
+
+	def test_completed_forces_completed(self):
+		doc = MagicMock()
+		doc.workflow_state = "Completed"
+		doc.repair_status = "Pending"
+
+		_sync_asset_repair_status_from_workflow(doc)
+
+		self.assertEqual(doc.repair_status, "Completed")
+
+	def test_cancelled_forces_cancelled(self):
+		doc = MagicMock()
+		doc.workflow_state = "Cancelled"
+		doc.repair_status = "Pending"
+
+		_sync_asset_repair_status_from_workflow(doc)
+
+		self.assertEqual(doc.repair_status, "Cancelled")
+
+	def test_other_workflow_states_leave_repair_status(self):
+		doc = MagicMock()
+		doc.workflow_state = "Pending Approval HM"
+		doc.repair_status = "Pending"
+
+		_sync_asset_repair_status_from_workflow(doc)
+
+		self.assertEqual(doc.repair_status, "Pending")
 
 
 class TestOnAssetRepairUpdate(unittest.TestCase):
@@ -50,11 +91,11 @@ class TestOnAssetRepairUpdate(unittest.TestCase):
 		self.assertEqual(kwargs["context"], "Asset Repair Completion")
 
 	@patch("songa_mobility_phase_2.songa_app_integration.events.events.send_songa_webhook")
-	def test_rejected_sends_service_rejected_even_if_repair_status_completed(self, send_webhook):
+	def test_rejected_sends_service_rejected(self, send_webhook):
 		doc = self._repair_doc(
 			workflow_state="Rejected",
 			previous_state="Pending Approval HM",
-			repair_status="Completed",
+			repair_status="Pending",
 		)
 
 		on_asset_repair_update(doc, "on_update")
@@ -62,7 +103,7 @@ class TestOnAssetRepairUpdate(unittest.TestCase):
 		send_webhook.assert_called_once()
 		payload, kwargs = send_webhook.call_args.args[0], send_webhook.call_args.kwargs
 		self.assertEqual(payload["action_type"], "Service Rejected")
-		self.assertEqual(payload["repair_status"], "Completed")
+		self.assertEqual(payload["repair_status"], "Pending")
 		self.assertEqual(payload["workflow_state"], "Rejected")
 		self.assertEqual(kwargs["context"], "Asset Repair Rejection")
 
@@ -113,7 +154,7 @@ class TestOnAssetRepairUpdate(unittest.TestCase):
 		doc = self._repair_doc(
 			workflow_state="Rejected",
 			previous_state="Pending Approval HM",
-			repair_status="Completed",
+			repair_status="Pending",
 			stock_consumption=1,
 			stock_items=[item],
 		)

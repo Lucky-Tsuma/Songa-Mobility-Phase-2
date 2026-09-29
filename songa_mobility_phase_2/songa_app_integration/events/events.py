@@ -226,6 +226,8 @@ def on_purchase_invoice_validate(doc, method):
 
 
 def on_asset_repair_validate(doc, method):
+	_sync_asset_repair_status_from_workflow(doc)
+
 	if not doc.asset:
 		return
 
@@ -244,6 +246,18 @@ def on_asset_repair_validate(doc, method):
 		branch = asset_details.custom_branch or asset_details.branch
 		if branch:
 			doc.branch = branch
+
+
+def _sync_asset_repair_status_from_workflow(doc):
+	"""Keep ERPNext repair_status aligned with terminal Songa workflow states."""
+	repair_status_by_workflow = {
+		"Rejected": "Pending",
+		"Completed": "Completed",
+		"Cancelled": "Cancelled",
+	}
+	expected = repair_status_by_workflow.get(doc.workflow_state)
+	if expected and doc.repair_status != expected:
+		doc.repair_status = expected
 
 
 def on_stock_entry_validate(doc, method):
