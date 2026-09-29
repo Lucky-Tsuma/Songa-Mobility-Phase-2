@@ -13,9 +13,18 @@ def on_asset_repair_update(doc, method):
 	if not doc.has_value_changed("workflow_state"):
 		return
 
-	if doc.workflow_state == "Completed" and doc.workflow_state != doc.get_doc_before_save().workflow_state:
+	if (
+		doc.workflow_state in ["Completed", "Cancelled", "Rejected"]
+		and doc.workflow_state != doc.get_doc_before_save().workflow_state
+	):
 		payload = {
-			"action_type": ("Service Completed" if doc.repair_status == "Completed" else "Service Cancelled"),
+			"action_type": (
+				"Service Completed"
+				if doc.workflow_state == "Completed"
+				else "Service Cancelled"
+				if doc.workflow_state == "Cancelled"
+				else "Service Rejected"
+			),
 			"asset_repair": doc.name,
 			"asset_repair_id": doc.custom_asset_repair_id,
 			"asset": doc.asset,
@@ -45,7 +54,15 @@ def on_asset_repair_update(doc, method):
 				for item in doc.stock_items
 			]
 
-		send_songa_webhook(payload, context="Asset Repair Completion")
+		context = (
+			"Asset Repair Completion"
+			if doc.workflow_state == "Completed"
+			else "Asset Repair Cancellation"
+			if doc.workflow_state == "Cancelled"
+			else "Asset Repair Rejection"
+		)
+
+		send_songa_webhook(payload, context=context)
 
 
 def _parse_party_name(full_name):
